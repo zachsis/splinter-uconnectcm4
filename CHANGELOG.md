@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **`--dashboard`**: a live, mtr-style in-place terminal UI (counters, rate/fails
+  sparklines, current fake identity, vendor-crowd histogram) instead of scrolling
+  log lines. Auto-falls-back to line logging when stdout isn't a TTY (piped /
+  systemd). Hand-rolled ANSI — no new dependencies. (#13)
 - **`--dense`**: self-calibrating maximum-visibility mode. Probes the controller
   (~10 s) for the fastest advertising interval it sustains, then advertises at
   `rotate-ms = --adverts-per-id × adv-ms` so each identity actually transmits

@@ -27,6 +27,7 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.BoolVar(&cfg.Dense, "dense", cfg.Dense, "self-calibrating maximum-visibility mode (probe then run at optimal settings)")
 	fs.BoolVar(&cfg.Aggressive, "aggressive", cfg.Aggressive, "in --dense, allow the lowest advertising interval (more visible, higher power)")
 	fs.IntVar(&cfg.AdvertsPerID, "adverts-per-id", cfg.AdvertsPerID, "advertising events per identity before rotating (dense dwell multiplier)")
+	fs.BoolVar(&cfg.Dashboard, "dashboard", cfg.Dashboard, "live mtr-style terminal dashboard instead of line logs (needs a TTY)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")
@@ -63,6 +64,9 @@ func (c Config) Validate() error {
 	}
 	if c.Dense && c.Benchmark {
 		return fmt.Errorf("--dense and --benchmark are mutually exclusive")
+	}
+	if c.Dashboard && c.Benchmark {
+		return fmt.Errorf("--dashboard is not supported with --benchmark (which is a bounded probe)")
 	}
 	if c.AdvertsPerID < 1 {
 		return fmt.Errorf("--adverts-per-id must be >= 1, got %d", c.AdvertsPerID)

@@ -45,28 +45,36 @@ func RandomStaticAddr(rng *rand.Rand) [6]byte {
 	}
 }
 
-// BuildAdvData returns a <=31-byte legacy advertising payload for a single
-// decoy: Flags, an optional vendor name, and optional vendor manufacturer data.
-// One vendor is chosen per call; both the name and the company ID come from that
-// same vendor. The payload is never shaped like Apple/Microsoft/Google formats.
-func BuildAdvData(cfg config.Config, rng *rand.Rand) []byte {
+// Decoy is a generated fake identity: the serialized advertising payload plus
+// the vendor it impersonates (surfaced for status/dashboard reporting).
+type Decoy struct {
+	AD        []byte // <=31-byte legacy advertising payload
+	CompanyID uint16 // the chosen vendor's Bluetooth SIG company ID
+	Name      string // the advertised name, or "" if none was emitted
+}
+
+// Build generates one decoy: Flags, an optional vendor name, and optional vendor
+// manufacturer data. One vendor is chosen per call; both the name and the company
+// ID come from that same vendor. The payload is never shaped like
+// Apple/Microsoft/Google formats.
+func Build(cfg config.Config, rng *rand.Rand) Decoy {
 	v := Vendors[rng.IntN(len(Vendors))]
 
 	buf := make([]byte, 0, AdvMaxLen)
 	buf = appendAD(buf, adFlags, []byte{flagsValue}) // always present
 
-	usedName := false
+	name := ""
 	if v.Name != "" && rng.IntN(100) < cfg.NameProb {
-		name := []byte(v.Name)
-		if fits(buf, name) {
-			buf = appendAD(buf, adName, name)
-			usedName = true
+		nb := []byte(v.Name)
+		if fits(buf, nb) {
+			buf = appendAD(buf, adName, nb)
+			name = v.Name
 		}
 	}
 
 	if rng.IntN(100) < cfg.MfgProb {
 		bodyLen := 3
-		if !usedName {
+		if name == "" {
 			bodyLen = 3 + rng.IntN(5) // 3..7
 		}
 		mfg := make([]byte, 2+bodyLen)
@@ -79,7 +87,12 @@ func BuildAdvData(cfg config.Config, rng *rand.Rand) []byte {
 			buf = appendAD(buf, adMfgData, mfg)
 		}
 	}
-	return buf
+	return Decoy{AD: buf, CompanyID: v.CompanyID, Name: name}
+}
+
+// BuildAdvData returns just the advertising payload for a single decoy.
+func BuildAdvData(cfg config.Config, rng *rand.Rand) []byte {
+	return Build(cfg, rng).AD
 }
 
 // fits reports whether an AD structure carrying data (1 length byte + 1 type

@@ -56,7 +56,7 @@ func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, n
 
 func TestCycleOrder(t *testing.T) {
 	f := &fakeCtrl{}
-	if err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2))); err != nil {
+	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2))); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"disable", "addr", "data", "enable"}
@@ -73,7 +73,7 @@ func TestCycleOrder(t *testing.T) {
 
 func TestCycleAbortsOnError(t *testing.T) {
 	f := &fakeCtrl{failOn: "addr", failWith: errors.New("boom")}
-	if err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2))); err == nil {
+	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2))); err == nil {
 		t.Fatal("expected error")
 	}
 	// After the failing SetRandomAddr, no data/enable should have run.
@@ -116,7 +116,7 @@ func TestRunPacedStopsOnCtx(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog()); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}); err != nil {
 		t.Fatal(err)
 	}
 	calls := f.snapshot()
@@ -132,7 +132,7 @@ func TestRunSetsParamsOnceAndDisablesOnExit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog()); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}); err != nil {
 		t.Fatal(err)
 	}
 	if f.params != 1 {
