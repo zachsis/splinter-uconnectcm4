@@ -70,7 +70,7 @@ func BuildAdvData(cfg config.Config, rng *rand.Rand) []byte {
 			bodyLen = 3 + rng.IntN(5) // 3..7
 		}
 		mfg := make([]byte, 2+bodyLen)
-		mfg[0] = byte(v.CompanyID)      // little-endian company ID
+		mfg[0] = byte(v.CompanyID) // little-endian company ID
 		mfg[1] = byte(v.CompanyID >> 8)
 		for i := 2; i < len(mfg); i++ {
 			mfg[i] = byte(rng.UintN(256))

@@ -14,9 +14,9 @@ const (
 
 // Opcode groups/commands (OGF/OCF) we use.
 const (
-	ogfLE       = 0x08
-	ogfHostCtl  = 0x03
-	ocfReset    = 0x0003 // with ogfHostCtl
+	ogfLE            = 0x08
+	ogfHostCtl       = 0x03
+	ocfReset         = 0x0003 // with ogfHostCtl
 	ocfSetRandomAddr = 0x0005
 	ocfSetAdvParams  = 0x0006
 	ocfSetAdvData    = 0x0008
