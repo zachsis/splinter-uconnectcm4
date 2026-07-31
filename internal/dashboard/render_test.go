@@ -27,6 +27,7 @@ func TestSparkline(t *testing.T) {
 
 func TestRenderFrame(t *testing.T) {
 	m := New("dense", 100, 200)
+	m.SetColor(false) // mono -> plain text for deterministic substring checks
 	m.Decoy([6]byte{0xC0, 0x11, 0x22, 0x33, 0x44, 0x55}, 0x0075, "Galaxy Buds")
 	m.Rate(5, 0)
 	m.Rate(6, 1)
@@ -43,6 +44,31 @@ func TestRenderFrame(t *testing.T) {
 	// fail% should reflect 1 fail out of (2 total + 1 fail).
 	if !strings.Contains(f, "%") {
 		t.Errorf("frame missing fail percentage:\n%s", f)
+	}
+}
+
+func TestThemeColorAndCycle(t *testing.T) {
+	m := New("paced", 100, 250)
+	m.Rate(4, 0)
+
+	// Color on (default, matrix) -> frame contains SGR color codes.
+	if got := RenderFrame(m.Snapshot(), 80, 24); !strings.Contains(got, "\x1b[38;5;") {
+		t.Errorf("colored frame missing SGR codes")
+	}
+	// Mono -> no color codes at all (byte-identical to plain text).
+	m.SetColor(false)
+	if got := RenderFrame(m.Snapshot(), 80, 24); strings.Contains(got, "\x1b[38") {
+		t.Errorf("mono frame should have no color codes:\n%q", got)
+	}
+	// UseTheme validates names; CycleTheme advances.
+	m.SetColor(true)
+	if !m.UseTheme("amber") || m.UseTheme("bogus") {
+		t.Errorf("UseTheme name handling wrong")
+	}
+	before := m.Snapshot().Theme.Name
+	m.CycleTheme()
+	if m.Snapshot().Theme.Name == before {
+		t.Errorf("CycleTheme did not advance from %q", before)
 	}
 }
 

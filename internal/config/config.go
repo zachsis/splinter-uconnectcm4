@@ -17,6 +17,7 @@ type Config struct {
 	Aggressive   bool          // in --dense, allow the lowest advertising interval (higher power)
 	AdvertsPerID int           // advertising events per identity before rotating (dense dwell multiplier)
 	Dashboard    bool          // live mtr-style terminal dashboard instead of line logs
+	Theme        string        // dashboard color theme name
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }
@@ -30,6 +31,7 @@ func Default() Config {
 		AdvMs:        100,
 		Benchmark:    false,
 		AdvertsPerID: 2,
+		Theme:        "matrix",
 		HCIIndex:     0,
 		Verbose:      false,
 	}

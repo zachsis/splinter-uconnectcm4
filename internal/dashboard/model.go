@@ -29,6 +29,43 @@ type Model struct {
 	mode       string
 	advMs      int
 	rotateMs   int
+	themeIdx   int
+	colorOn    bool
+}
+
+// SetColor enables or disables ANSI color (disabled => mono regardless of theme).
+func (m *Model) SetColor(on bool) {
+	m.mu.Lock()
+	m.colorOn = on
+	m.mu.Unlock()
+}
+
+// UseTheme selects a theme by name; returns false for an unknown name.
+func (m *Model) UseTheme(name string) bool {
+	for i, n := range themeOrder {
+		if n == name {
+			m.mu.Lock()
+			m.themeIdx = i
+			m.mu.Unlock()
+			return true
+		}
+	}
+	return false
+}
+
+// CycleTheme advances to the next theme (the `t` hotkey).
+func (m *Model) CycleTheme() {
+	m.mu.Lock()
+	m.themeIdx = (m.themeIdx + 1) % len(themeOrder)
+	m.mu.Unlock()
+}
+
+// effectiveTheme returns the active theme (mono when color is off). Caller holds mu.
+func (m *Model) effectiveTheme() Theme {
+	if !m.colorOn {
+		return monoTheme
+	}
+	return themes[themeOrder[m.themeIdx]]
 }
 
 // RateAdjuster is the subset of engine.RateControl the dashboard needs to show
@@ -53,6 +90,7 @@ func New(mode string, advMs, rotateMs int) *Model {
 		mode:       mode,
 		advMs:      advMs,
 		rotateMs:   rotateMs,
+		colorOn:    true, // default; main disables via SetColor when unsupported
 	}
 }
 
@@ -103,6 +141,7 @@ type Snapshot struct {
 	Mode     string
 	AdvMs    int
 	RotateMs int
+	Theme    Theme
 }
 
 // Snapshot copies the current state under lock.
@@ -133,5 +172,6 @@ func (m *Model) Snapshot() Snapshot {
 		Mode:     m.mode,
 		AdvMs:    m.advMs,
 		RotateMs: m.rotateMs,
+		Theme:    m.effectiveTheme(),
 	}
 }

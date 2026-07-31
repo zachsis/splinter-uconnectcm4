@@ -131,20 +131,27 @@ func RenderFrame(s Snapshot, width, height int) string {
 		sparkW = 10
 	}
 
+	t := s.Theme
 	var b strings.Builder
-	fmt.Fprintf(&b, "splinterd — %s · adv %dms · dwell %dms\n\n", s.Mode, s.AdvMs, s.RotateMs)
-	fmt.Fprintf(&b, "  uptime %s     total %d     Bluetooth hci0 (exclusive)\n\n",
-		fmtDur(s.Uptime), s.Total)
-	fmt.Fprintf(&b, "  rate   %s  %d/s   peak %d  avg %.1f\n", Sparkline(s.RateHist, sparkW), cur, peak, avg)
-	fmt.Fprintf(&b, "  fails  %s  %.1f%%\n\n", Sparkline(s.FailHist, sparkW), failPct)
+	fmt.Fprintf(&b, "%s\n\n", paint(t.Header,
+		fmt.Sprintf("splinterd — %s · adv %dms · dwell %dms", s.Mode, s.AdvMs, s.RotateMs)))
+	fmt.Fprintf(&b, "  %s %s     %s %d     Bluetooth hci0 (exclusive)\n\n",
+		paint(t.Label, "uptime"), fmtDur(s.Uptime), paint(t.Label, "total"), s.Total)
+	fmt.Fprintf(&b, "  %s   %s  %s   peak %d  avg %.1f\n",
+		paint(t.Label, "rate"), paint(t.Spark, Sparkline(s.RateHist, sparkW)),
+		paint(t.Value, fmt.Sprintf("%d/s", cur)), peak, avg)
+	fmt.Fprintf(&b, "  %s  %s  %s\n\n",
+		paint(t.Label, "fails"), paint(t.Warn, Sparkline(s.FailHist, sparkW)),
+		paint(t.Warn, fmt.Sprintf("%.1f%%", failPct)))
 	if s.HaveLast {
 		name := s.LastName
 		if name == "" {
 			name = "(nameless)"
 		}
-		fmt.Fprintf(&b, "  now    %s  %q  %s\n\n", macStr(s.LastAddr), name, companyLabel(s.LastID))
+		fmt.Fprintf(&b, "  %s    %s  %s  %s\n\n", paint(t.Label, "now"),
+			macStr(s.LastAddr), paint(t.Value, fmt.Sprintf("%q", name)), paint(t.Label, companyLabel(s.LastID)))
 	}
-	fmt.Fprintf(&b, "  crowd  %s\n\n", crowd(s.Vendors, width-9))
-	b.WriteString("  +/- rate  ·  q/Ctrl-C quit\n")
+	fmt.Fprintf(&b, "  %s  %s\n\n", paint(t.Label, "crowd"), crowd(s.Vendors, width-9))
+	b.WriteString("  " + paint(t.Dim, "+/- rate  ·  t theme  ·  q/Ctrl-C quit") + "\n")
 	return b.String()
 }
