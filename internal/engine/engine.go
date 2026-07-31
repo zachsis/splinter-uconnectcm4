@@ -28,10 +28,27 @@ type Controller interface {
 	SetAdvData(ad []byte) error
 }
 
+// Reporter receives decoy activity so it can be rendered (line log, dashboard…)
+// without coupling the engine to any output format.
+type Reporter interface {
+	Decoy(addr [6]byte, companyID uint16, name string) // per decoy minted
+	Rate(devPerSec, fails int)                         // once per second
+}
+
+// LogReporter is the default Reporter: it logs the per-second rate via slog,
+// matching splinterd's original line output. Individual decoys are too frequent
+// to log, so Decoy is a no-op.
+type LogReporter struct{ Log *slog.Logger }
+
+func (r LogReporter) Decoy(addr [6]byte, companyID uint16, name string) {}
+func (r LogReporter) Rate(devPerSec, fails int) {
+	r.Log.Info("rate", "devices_per_sec", devPerSec, "fail", fails)
+}
+
 // Run drives the rotation loop until ctx is cancelled. Advertising parameters
 // are set once up front; each cycle then disables advertising, mints a fresh
 // random MAC + decoy payload, and re-enables. On return, advertising is disabled.
-func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger) error {
+func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter) error {
 	rng := newRNG()
 
 	min := uint16(cfg.AdvMs)
@@ -60,18 +77,20 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 		if ctx.Err() != nil {
 			return nil
 		}
-		if err := cycle(ctrl, cfg, rng); err != nil {
+		addr, d, err := cycle(ctrl, cfg, rng)
+		if err != nil {
 			fail++
 			if cfg.Verbose {
 				log.Debug("decoy cycle failed", "err", err)
 			}
 		} else {
 			ok++
+			rep.Decoy(addr, d.CompanyID, d.Name)
 		}
 
 		select {
 		case <-tick.C:
-			log.Info("rate", "devices_per_sec", ok, "fail", fail)
+			rep.Rate(int(ok), int(fail))
 			ok, fail = 0, 0
 		default:
 		}
@@ -106,7 +125,7 @@ func Calibrate(ctx context.Context, ctrl Controller, cfg config.Config, candidat
 		var ok, fail int
 		deadline := time.Now().Add(perCandidate)
 		for time.Now().Before(deadline) && ctx.Err() == nil {
-			if err := cycle(ctrl, cfg, rng); err != nil {
+			if _, _, err := cycle(ctrl, cfg, rng); err != nil {
 				fail++
 			} else {
 				ok++
@@ -130,17 +149,20 @@ func Calibrate(ctx context.Context, ctrl Controller, cfg config.Config, candidat
 // is rejected by some controllers (e.g. the CYW43455 returns "Command
 // Disallowed"). A genuine failure to disable while advertising is active surfaces
 // on the next command (SetRandomAddr is illegal while advertising).
-func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand) error {
+func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand) ([6]byte, decoy.Decoy, error) {
 	_ = ctrl.SetAdvEnable(false)
 	addr := decoy.RandomStaticAddr(rng)
 	if err := ctrl.SetRandomAddr(addr); err != nil {
-		return err
+		return addr, decoy.Decoy{}, err
 	}
-	ad := decoy.BuildAdvData(cfg, rng)
-	if err := ctrl.SetAdvData(ad); err != nil {
-		return err
+	d := decoy.Build(cfg, rng)
+	if err := ctrl.SetAdvData(d.AD); err != nil {
+		return addr, decoy.Decoy{}, err
 	}
-	return ctrl.SetAdvEnable(true)
+	if err := ctrl.SetAdvEnable(true); err != nil {
+		return addr, decoy.Decoy{}, err
+	}
+	return addr, d, nil
 }
 
 // newRNG seeds math/rand/v2 from crypto/rand.

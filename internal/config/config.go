@@ -16,6 +16,7 @@ type Config struct {
 	Dense        bool          // self-calibrating maximum-visibility mode
 	Aggressive   bool          // in --dense, allow the lowest advertising interval (higher power)
 	AdvertsPerID int           // advertising events per identity before rotating (dense dwell multiplier)
+	Dashboard    bool          // live mtr-style terminal dashboard instead of line logs
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }

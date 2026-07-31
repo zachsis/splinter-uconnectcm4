@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/zachsis/splinter-uconnectcm4/internal/config"
+	"github.com/zachsis/splinter-uconnectcm4/internal/dashboard"
 	"github.com/zachsis/splinter-uconnectcm4/internal/engine"
 	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
 	"github.com/zachsis/splinter-uconnectcm4/internal/tune"
@@ -67,21 +69,29 @@ func run(cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex)
 	if cfg.Benchmark {
+		log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex)
 		return runBenchmark(ctx, conn, cfg, log)
 	}
+
 	if cfg.Dense {
-		return runDense(ctx, conn, cfg, log)
+		derived, err := calibrateDense(ctx, conn, cfg, log)
+		if err != nil {
+			return err
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		cfg = derived
 	}
-	return engine.Run(ctx, conn, cfg, log)
+
+	return runLoop(ctx, conn, cfg, log)
 }
 
-// runDense calibrates (~10s) to find the fastest advertising interval the
-// controller sustains, then advertises at the derived visibility-optimal
-// settings (dwell = adverts-per-id x adv-ms), which guarantees each identity
-// transmits before it rotates.
-func runDense(ctx context.Context, conn engine.Controller, cfg config.Config, log *slog.Logger) error {
+// calibrateDense probes (~10s) for the fastest advertising interval the
+// controller sustains and returns cfg with the derived visibility-optimal
+// adv-ms / rotate-ms (dwell = adverts-per-id x adv-ms).
+func calibrateDense(ctx context.Context, conn engine.Controller, cfg config.Config, log *slog.Logger) (config.Config, error) {
 	candidates := tune.CalmCandidates
 	if cfg.Aggressive {
 		candidates = tune.AggressiveCandidates
@@ -91,17 +101,51 @@ func runDense(ctx context.Context, conn engine.Controller, cfg config.Config, lo
 
 	probes := engine.Calibrate(ctx, conn, cfg, candidates, per, log)
 	if ctx.Err() != nil {
-		return nil
+		return cfg, nil
 	}
 	rec, ok := tune.Recommend(probes, cfg.AdvertsPerID)
 	if !ok {
-		return fmt.Errorf("dense calibration produced no usable settings")
+		return cfg, fmt.Errorf("dense calibration produced no usable settings")
 	}
 	cfg.AdvMs = rec.AdvMs
 	cfg.RotateMs = rec.RotateMs
 	log.Info("dense: calibrated", "adv_ms", rec.AdvMs, "rotate_ms", rec.RotateMs,
 		"visible_per_sec_est", fmt.Sprintf("%.0f", rec.VisiblePerSec))
-	return engine.Run(ctx, conn, cfg, log)
+	return cfg, nil
+}
+
+// runLoop advertises using either the live dashboard (TTY) or line logging.
+func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log *slog.Logger) error {
+	mode := "paced"
+	if cfg.Dense {
+		mode = "dense"
+	}
+
+	if cfg.Dashboard {
+		if dashboard.IsTerminal(os.Stdout.Fd()) {
+			m := dashboard.New(mode, cfg.AdvMs, cfg.RotateMs)
+			dctx, dcancel := context.WithCancel(ctx)
+			done := make(chan struct{})
+			go func() {
+				dashboard.Run(dctx, m, os.Stdout, os.Stdout.Fd())
+				close(done)
+			}()
+			// Logs would corrupt the frame, so silence the engine's logger while
+			// the dashboard owns the screen.
+			err := engine.Run(ctx, conn, cfg, quietLogger(), m)
+			dcancel()
+			<-done // wait for the terminal to be restored
+			return err
+		}
+		log.Warn("--dashboard: stdout is not a terminal; falling back to line logging")
+	}
+
+	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
+	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log})
+}
+
+func quietLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 // runBenchmark probes advertising intervals for a bounded window and prints the
