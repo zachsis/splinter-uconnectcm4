@@ -40,6 +40,52 @@ func Sparkline(samples []int, width int) string {
 	return b.String()
 }
 
+// blockGraph renders samples as a `rows`-tall vertical bar graph using block
+// glyphs (▁..█), right-aligned so the newest sample is at the right. It returns
+// `rows` lines, top row first. Each column's value is scaled to the window max
+// and drawn across rows*8 vertical levels.
+func blockGraph(samples []int, width, rows int) []string {
+	if rows < 1 {
+		rows = 1
+	}
+	if width < 1 {
+		width = 1
+	}
+	if len(samples) > width {
+		samples = samples[len(samples)-width:]
+	}
+	max := 1
+	for _, v := range samples {
+		if v > max {
+			max = v
+		}
+	}
+	levels := rows * 8
+	pad := width - len(samples)
+
+	lines := make([]string, rows)
+	for r := rows - 1; r >= 0; r-- { // r = 0 is the bottom row
+		var b strings.Builder
+		for i := 0; i < pad; i++ {
+			b.WriteByte(' ')
+		}
+		base := r * 8
+		for _, v := range samples {
+			eighths := v * levels / max
+			switch {
+			case eighths >= base+8:
+				b.WriteRune('█')
+			case eighths <= base:
+				b.WriteByte(' ')
+			default:
+				b.WriteRune(blocks[eighths-base-1]) // 1..7 -> ▁..▇
+			}
+		}
+		lines[rows-1-r] = b.String() // top row first
+	}
+	return lines
+}
+
 // companyLabel maps the vendor IDs splinter emits to friendly names for display.
 func companyLabel(id uint16) string {
 	switch id {
@@ -137,9 +183,15 @@ func RenderFrame(s Snapshot, width, height int) string {
 		fmt.Sprintf("splinterd — %s · adv %dms · dwell %dms", s.Mode, s.AdvMs, s.RotateMs)))
 	fmt.Fprintf(&b, "  %s %s     %s %d     Bluetooth hci0 (exclusive)\n\n",
 		paint(t.Label, "uptime"), fmtDur(s.Uptime), paint(t.Label, "total"), s.Total)
-	fmt.Fprintf(&b, "  %s   %s  %s   peak %d  avg %.1f\n",
-		paint(t.Label, "rate"), paint(t.Spark, Sparkline(s.RateHist, sparkW)),
-		paint(t.Value, fmt.Sprintf("%d/s", cur)), peak, avg)
+	fmt.Fprintf(&b, "  %s   %s   peak %d  avg %.1f\n",
+		paint(t.Label, "rate"), paint(t.Value, fmt.Sprintf("%d/s", cur)), peak, avg)
+	graphRows := 4
+	if height > 0 && height < 18 {
+		graphRows = 2 // short screen: keep it compact
+	}
+	for _, line := range blockGraph(s.RateHist, sparkW, graphRows) {
+		fmt.Fprintf(&b, "  %s\n", paint(t.Spark, line))
+	}
 	fmt.Fprintf(&b, "  %s  %s  %s\n\n",
 		paint(t.Label, "fails"), paint(t.Warn, Sparkline(s.FailHist, sparkW)),
 		paint(t.Warn, fmt.Sprintf("%.1f%%", failPct)))
