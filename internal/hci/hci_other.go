@@ -2,7 +2,10 @@
 
 package hci
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // errUnsupported is returned by all transport operations off Linux. splinterd's
 // HCI transport is Linux-only; this stub lets the tree build and unit-test the
@@ -19,3 +22,4 @@ func (c *Conn) SetAdvEnable(on bool) error                     { return errUnsup
 func (c *Conn) SetRandomAddr(a [6]byte) error                  { return errUnsupported }
 func (c *Conn) SetAdvParams(minMs, maxMs uint16, t byte) error { return errUnsupported }
 func (c *Conn) SetAdvData(ad []byte) error                     { return errUnsupported }
+func (c *Conn) Scan(w time.Duration) ([]AdvReport, error)      { return nil, errUnsupported }

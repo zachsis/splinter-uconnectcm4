@@ -85,6 +85,43 @@ func TestParseCommandComplete(t *testing.T) {
 	}
 }
 
+func TestParseAdvReports(t *testing.T) {
+	// One LE Advertising Report: non-connectable (0x03), addr, flags AD, RSSI.
+	pkt := []byte{
+		pktEvent, evtLEMeta, 0x10, subEvtAdvReport,
+		0x01,                               // num reports
+		0x03,                               // event type ADV_NONCONN_IND
+		0x01,                               // addr type (random)
+		0x11, 0x22, 0x33, 0x44, 0x55, 0xC0, // addr (LE)
+		0x03, 0x02, 0x01, 0x06, // data len 3 + flags AD
+		0xC5, // RSSI
+	}
+	rs := parseAdvReports(pkt)
+	if len(rs) != 1 {
+		t.Fatalf("want 1 report, got %d", len(rs))
+	}
+	if rs[0].Connectable {
+		t.Errorf("ADV_NONCONN_IND should be non-connectable")
+	}
+	if rs[0].Addr != [6]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0xC0} {
+		t.Errorf("addr = % x", rs[0].Addr)
+	}
+	if string(rs[0].Data) != string([]byte{0x02, 0x01, 0x06}) {
+		t.Errorf("data = % x", rs[0].Data)
+	}
+	// A connectable report (ADV_IND = 0x00).
+	pkt[5] = 0x00
+	if rs := parseAdvReports(pkt); !rs[0].Connectable {
+		t.Errorf("ADV_IND should be connectable")
+	}
+	// Non-adv-report events are ignored.
+	if parseAdvReports([]byte{pktEvent, evtCommandComplete, 0x04, 0x01, 0x0A, 0x20, 0x00}) != nil {
+		t.Errorf("non-adv-report event should yield nil")
+	}
+	// Truncated report is skipped without panicking.
+	_ = parseAdvReports([]byte{pktEvent, evtLEMeta, 0x03, subEvtAdvReport, 0x01, 0x03})
+}
+
 func TestParseMgmtCmdComplete(t *testing.T) {
 	// mgmt CMD_COMPLETE (0x0001), index 0, len 3, cmd_op=SET_POWERED, status 0, settings byte
 	frame := []byte{0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x05, 0x00, 0x00}

@@ -21,10 +21,55 @@ const (
 	ocfSetAdvParams  = 0x0006
 	ocfSetAdvData    = 0x0008
 	ocfSetAdvEnable  = 0x000A
+	ocfSetScanParams = 0x000B
+	ocfSetScanEnable = 0x000C
 )
 
 // Event codes.
-const evtCommandComplete = 0x0E
+const (
+	evtCommandComplete = 0x0E
+	evtLEMeta          = 0x3E
+	subEvtAdvReport    = 0x02
+)
+
+// AdvReport is one observed advertising report from a passive scan.
+type AdvReport struct {
+	Addr        [6]byte
+	Connectable bool
+	Data        []byte // raw advertising payload (AD structures)
+}
+
+// parseAdvReports extracts advertising reports from an LE Advertising Report
+// meta event. Returns nil for any other packet or on truncation.
+func parseAdvReports(pkt []byte) []AdvReport {
+	if len(pkt) < 4 || pkt[0] != pktEvent || pkt[1] != evtLEMeta || pkt[3] != subEvtAdvReport {
+		return nil
+	}
+	p := pkt[4:]
+	if len(p) < 1 {
+		return nil
+	}
+	num := int(p[0])
+	p = p[1:]
+	var out []AdvReport
+	for i := 0; i < num; i++ {
+		if len(p) < 9 {
+			break
+		}
+		evType := p[0]
+		dataLen := int(p[8])
+		if len(p) < 9+dataLen+1 {
+			break
+		}
+		var r AdvReport
+		copy(r.Addr[:], p[2:8])
+		r.Connectable = evType == 0x00 || evType == 0x01 // ADV_IND / ADV_DIRECT_IND
+		r.Data = append([]byte(nil), p[9:9+dataLen]...)
+		out = append(out, r)
+		p = p[9+dataLen+1:] // advance past this report (incl. RSSI byte)
+	}
+	return out
+}
 
 // ADV_NONCONN_IND — non-connectable, non-scannable undirected advertising.
 const AdvNonconnInd = 0x03
