@@ -12,4 +12,5 @@ import (
 func IsTerminal(fd uintptr) bool { return false }
 
 // Run is a no-op off Linux.
-func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr) {}
+func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func()) {
+}

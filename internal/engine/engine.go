@@ -48,8 +48,12 @@ func (r LogReporter) Rate(devPerSec, fails int) {
 // Run drives the rotation loop until ctx is cancelled. Advertising parameters
 // are set once up front; each cycle then disables advertising, mints a fresh
 // random MAC + decoy payload, and re-enables. On return, advertising is disabled.
-func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter) error {
+func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl) error {
 	rng := newRNG()
+
+	if rate == nil {
+		rate = NewRateControl(cfg.RotateMs, cfg.AdvMs, 2000)
+	}
 
 	min := uint16(cfg.AdvMs)
 	max := uint16(cfg.AdvMs + 30)
@@ -99,7 +103,7 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-time.After(time.Duration(cfg.RotateMs) * time.Millisecond):
+			case <-time.After(rate.Duration()):
 			}
 		}
 	}
