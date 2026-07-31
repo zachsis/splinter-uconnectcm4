@@ -87,6 +87,7 @@ splinterd [flags]
 | `--duration` | 10s | `--benchmark` run time |
 | `--hci` | 0 | HCI device index to drive (`hciX`) |
 | `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or under systemd) |
+| `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `mono` (honors `NO_COLOR`) |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
@@ -117,6 +118,10 @@ Add **`--dashboard`** to any run mode for a live, in-place-refreshing terminal v
 histogram) instead of scrolling log lines — think `mtr`. It needs an interactive
 terminal; when stdout isn't a TTY (piped, or under systemd) it automatically falls
 back to line logging.
+
+Dashboard **hotkeys**: `+`/`-` raise/lower the live rate (clamped to the visibility
+floor), `t` cycles the color theme, and `q` (or Ctrl-C) quits. Pick a starting
+palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
 
 On the uConsole's **CYW43455**, non-connectable advertising is floored at **100 ms**
 (the legacy `ADV_NONCONN_IND` minimum — the chip rejects lower), so `--dense`
