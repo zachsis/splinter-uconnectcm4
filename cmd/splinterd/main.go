@@ -3,35 +3,34 @@
 // uConsole (CM4). It fabricates a churning crowd of plausible, non-connectable
 // fake BLE devices so real devices don't stand out to a scanner in a space you
 // control.
-//
-// The bootstrap milestone provides a compilable entrypoint with --version; the
-// full flag surface and run loop are wired in later milestones.
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"os"
+
+	"github.com/zachsis/splinter-uconnectcm4/internal/config"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
 var version = "dev"
 
 func main() {
-	for _, a := range os.Args[1:] {
-		switch a {
-		case "--version", "-version":
-			fmt.Println("splinterd", version)
-			return
-		case "--help", "-h", "-help":
-			usage(os.Stdout)
-			return
-		}
+	cfg, err := config.Parse("splinterd", os.Args[1:], os.Stderr)
+	switch {
+	case errors.Is(err, config.ErrVersion):
+		fmt.Println("splinterd", version)
+		return
+	case errors.Is(err, flag.ErrHelp):
+		return // usage already printed by the flag package
+	case err != nil:
+		fmt.Fprintln(os.Stderr, "splinterd:", err)
+		os.Exit(2)
 	}
-	usage(os.Stderr)
-}
 
-func usage(w *os.File) {
-	fmt.Fprintln(w, "splinterd — BLE privacy decoy (uConsole/Linux)")
-	fmt.Fprintln(w, "usage: splinterd [--version] [--help]")
-	fmt.Fprintln(w, "(the run loop and tuning flags are added in later milestones)")
+	// The run loop, HCI transport wiring, signal handling, and clean bluetoothd
+	// hand-back are added in the daemon-lifecycle milestone.
+	fmt.Printf("splinterd configured: %+v\n", cfg)
 }
