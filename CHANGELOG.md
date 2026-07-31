@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`--dense`**: self-calibrating maximum-visibility mode. Probes the controller
+  (~10 s) for the fastest advertising interval it sustains, then advertises at
+  `rotate-ms = --adverts-per-id × adv-ms` so each identity actually transmits
+  before rotating. `--aggressive` allows the lowest interval; `--adverts-per-id`
+  (default 2) tunes dwell. (#11)
+- **Bounded self-calibrating `--benchmark`**: now probes advertising intervals for
+  `--duration` (default 10 s) and prints the recommended visibility-optimal
+  `(--adv-ms, --rotate-ms)`, then exits. (#10)
+- Guardrail: warns when `--rotate-ms < --adv-ms` (decoys rotate before they
+  transmit and aren't visible to scanners).
+
+### Changed
+- **`--benchmark` semantics**: was an unbounded max-HCI-rate flood; is now a
+  bounded calibration + recommendation. The old flood maximized command rate but
+  broadcast almost nothing observable (each identity was replaced before it
+  transmitted).
+
+### Notes
+- On the uConsole's CYW43455, non-connectable advertising is floored at 100 ms;
+  `--dense` calibrates to `adv-ms=100, rotate-ms=200` (~5 visible decoys/sec).
+
 ## v0.1.0 — 2026-07-31
 
 Initial release. A native Linux/Go port of the [splinter](https://github.com/JakeSwiz/splinter)

@@ -84,6 +84,31 @@ func TestCycleAbortsOnError(t *testing.T) {
 	}
 }
 
+func TestCalibrate(t *testing.T) {
+	f := &fakeCtrl{}
+	probes := Calibrate(context.Background(), f, config.Default(),
+		[]int{20, 50}, 10*time.Millisecond, quietLog())
+	if len(probes) != 2 {
+		t.Fatalf("want 2 probes, got %d", len(probes))
+	}
+	if probes[0].AdvMs != 20 || probes[1].AdvMs != 50 {
+		t.Fatalf("adv-ms mismatch: %+v", probes)
+	}
+	for _, p := range probes {
+		if p.Cycles == 0 {
+			t.Fatalf("probe %d ran no cycles", p.AdvMs)
+		}
+		if p.Fails != 0 {
+			t.Fatalf("clean fake should have 0 fails: %+v", p)
+		}
+	}
+	// One SetAdvParams per candidate, plus the params call inside each cycle... none:
+	// cycle() does not set params, so params calls == number of candidates.
+	if f.params != 2 {
+		t.Fatalf("SetAdvParams called %d times, want 2 (one per candidate)", f.params)
+	}
+}
+
 func TestRunPacedStopsOnCtx(t *testing.T) {
 	f := &fakeCtrl{}
 	cfg := config.Default()

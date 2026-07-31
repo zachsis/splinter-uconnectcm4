@@ -22,7 +22,11 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.IntVar(&cfg.NameProb, "name-prob", cfg.NameProb, "percent chance a decoy advertises a name (0-100)")
 	fs.IntVar(&cfg.MfgProb, "mfg-prob", cfg.MfgProb, "percent chance a decoy carries vendor mfg data (0-100)")
 	fs.IntVar(&cfg.AdvMs, "adv-ms", cfg.AdvMs, "on-air advertising interval minimum in ms (max = this + 30)")
-	fs.BoolVar(&cfg.Benchmark, "benchmark", cfg.Benchmark, "max-rate flood mode instead of paced")
+	fs.BoolVar(&cfg.Benchmark, "benchmark", cfg.Benchmark, "bounded self-calibrating benchmark: probe intervals and recommend optimal settings")
+	fs.DurationVar(&cfg.Duration, "duration", cfg.Duration, "benchmark duration (e.g. 20s; 0 = 10s default)")
+	fs.BoolVar(&cfg.Dense, "dense", cfg.Dense, "self-calibrating maximum-visibility mode (probe then run at optimal settings)")
+	fs.BoolVar(&cfg.Aggressive, "aggressive", cfg.Aggressive, "in --dense, allow the lowest advertising interval (more visible, higher power)")
+	fs.IntVar(&cfg.AdvertsPerID, "adverts-per-id", cfg.AdvertsPerID, "advertising events per identity before rotating (dense dwell multiplier)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")
@@ -56,6 +60,12 @@ func (c Config) Validate() error {
 	}
 	if c.HCIIndex < 0 {
 		return fmt.Errorf("--hci must be >= 0, got %d", c.HCIIndex)
+	}
+	if c.Dense && c.Benchmark {
+		return fmt.Errorf("--dense and --benchmark are mutually exclusive")
+	}
+	if c.AdvertsPerID < 1 {
+		return fmt.Errorf("--adverts-per-id must be >= 1, got %d", c.AdvertsPerID)
 	}
 	return nil
 }
