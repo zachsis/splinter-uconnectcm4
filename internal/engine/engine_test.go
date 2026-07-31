@@ -116,7 +116,7 @@ func TestRunPacedStopsOnCtx(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	calls := f.snapshot()
@@ -132,7 +132,7 @@ func TestRunSetsParamsOnceAndDisablesOnExit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if f.params != 1 {

@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -37,6 +38,12 @@ func main() {
 		return // usage already printed by the flag package
 	case err != nil:
 		fmt.Fprintln(os.Stderr, "splinterd:", err)
+		os.Exit(2)
+	}
+
+	if !dashboard.ValidTheme(cfg.Theme) {
+		fmt.Fprintf(os.Stderr, "splinterd: unknown --theme %q (valid: %s)\n",
+			cfg.Theme, strings.Join(dashboard.ThemeNames(), ", "))
 		os.Exit(2)
 	}
 
@@ -123,17 +130,23 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 
 	if cfg.Dashboard {
 		if dashboard.IsTerminal(os.Stdout.Fd()) {
+			// A cancelable child context so an in-dashboard 'q' quits everything.
+			runCtx, runCancel := context.WithCancel(ctx)
+			defer runCancel()
+
 			m := dashboard.New(mode, cfg.AdvMs, cfg.RotateMs)
-			dctx, dcancel := context.WithCancel(ctx)
+			m.SetColor(dashboard.ColorEnabled())
+			m.UseTheme(cfg.Theme)
+			rate := engine.NewRateControl(cfg.RotateMs, cfg.AdvMs, 2000)
 			done := make(chan struct{})
 			go func() {
-				dashboard.Run(dctx, m, os.Stdout, os.Stdout.Fd())
+				dashboard.Run(runCtx, m, os.Stdout, os.Stdout.Fd(), rate, runCancel)
 				close(done)
 			}()
 			// Logs would corrupt the frame, so silence the engine's logger while
 			// the dashboard owns the screen.
-			err := engine.Run(ctx, conn, cfg, quietLogger(), m)
-			dcancel()
+			err := engine.Run(runCtx, conn, cfg, quietLogger(), m, rate)
+			runCancel()
 			<-done // wait for the terminal to be restored
 			return err
 		}
@@ -141,7 +154,7 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 	}
 
 	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
-	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log})
+	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log}, nil)
 }
 
 func quietLogger() *slog.Logger {

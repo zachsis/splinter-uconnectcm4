@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **Dashboard hotkeys** (`--dashboard`): `+`/`-` adjust the live rate (clamped to
+  the visibility floor), `t` cycles the color theme, `q`/Ctrl-C quits. (#16)
+- **Color themes** for the dashboard: `--theme matrix|amber|neon|mono` + live `t`
+  cycling; honors `NO_COLOR` / non-color terminals (falls back to mono). (#18)
+- Expanded the decoy vendor table to 26 entries across 6 device categories. (#15)
+
+### Added
 - **`--dashboard`**: a live, mtr-style in-place terminal UI (counters, rate/fails
   sparklines, current fake identity, vendor-crowd histogram) instead of scrolling
   log lines. Auto-falls-back to line logging when stdout isn't a TTY (piped /
