@@ -76,19 +76,45 @@ splinterd [flags]
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--rotate-ms` | 250 | paced-mode delay between decoys (ms) |
+| `--rotate-ms` | 250 | paced-mode dwell per identity before rotating (ms) |
+| `--adv-ms` | 100 | advertising interval minimum (ms); max = this + 30. Validation floor 20 (BLE); note this controller rejects non-connectable intervals below 100 ms |
 | `--name-prob` | 40 | % chance a decoy advertises a name |
 | `--mfg-prob` | 90 | % chance a decoy carries vendor manufacturer data |
-| `--adv-ms` | 100 | on-air advertising interval minimum (ms); max = this + 30. **Must be ≥ 20** (BLE floor) |
-| `--benchmark` | false | max-rate flood mode (reports devices/sec) instead of paced |
+| `--dense` | false | self-calibrating maximum-visibility mode (probe, then run at the optimal settings) |
+| `--aggressive` | false | with `--dense`, allow the lowest advertising interval (more visible, more power) |
+| `--adverts-per-id` | 2 | advertising events per identity before rotating (dense dwell = this × adv-ms) |
+| `--benchmark` | false | bounded self-calibration: probe intervals, print recommended settings, then exit |
+| `--duration` | 10s | `--benchmark` run time |
 | `--hci` | 0 | HCI device index to drive (`hciX`) |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
 It needs `CAP_NET_RAW` + `CAP_NET_ADMIN` (the systemd unit grants both to an
 unprivileged `splinter` user; running by hand needs `sudo` or `setcap`). Once
-running it logs `rate: devices_per_sec=N` every second. Watch the crowd with a
-BLE scanner app such as nRF Connect.
+running it logs `rate: devices_per_sec=N` every second.
+
+### Getting a crowd a scanner actually sees
+
+A decoy is only observable if its identity stays on-air long enough to transmit at
+least one advertising packet — i.e. the **dwell (`--rotate-ms`) must be ≥ the
+advertising interval (`--adv-ms`)**. Rotating faster than you advertise (the old
+"flood") maxes out HCI commands but broadcasts almost nothing; splinterd warns if
+you configure `--rotate-ms < --adv-ms`.
+
+The easy path is **`--dense`**, which probes the controller for ~10 s to find the
+fastest advertising interval it actually sustains, then runs at the
+visibility-optimal `rotate-ms = --adverts-per-id × adv-ms`:
+
+```bash
+sudo splinterd --dense              # calm default
+sudo splinterd --dense --aggressive # push to the lowest interval the radio allows
+splinterd --benchmark               # just probe + print the recommended flags, don't run
+```
+
+On the uConsole's **CYW43455**, non-connectable advertising is floored at **100 ms**
+(the legacy `ADV_NONCONN_IND` minimum — the chip rejects lower), so `--dense`
+calibrates to `adv-ms=100, rotate-ms=200` (~5 visible decoys/sec). Confirm the crowd
+with a BLE scanner (nRF Connect) or `splinter-verify` on a second device.
 
 ## Bluetooth coexistence
 
