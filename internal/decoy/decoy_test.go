@@ -93,9 +93,11 @@ func TestBuildAdvDataStructure(t *testing.T) {
 }
 
 func TestNoExcludedVendors(t *testing.T) {
-	if len(Vendors) < 8 {
-		t.Fatalf("vendor table too small for a meaningful crowd: %d", len(Vendors))
+	if len(Vendors) < 25 {
+		t.Fatalf("vendor table too small for a diverse crowd: %d (want >= 25)", len(Vendors))
 	}
+	ids := map[uint16]struct{}{}
+	named, nameless := 0, 0
 	for _, v := range Vendors {
 		if v.CompanyID == CompanyApple || v.CompanyID == CompanyMicrosoft || v.CompanyID == ServiceGoogleFastPair {
 			t.Fatalf("excluded company id in table: %#04x", v.CompanyID)
@@ -103,6 +105,18 @@ func TestNoExcludedVendors(t *testing.T) {
 		if len(v.Name) > 12 {
 			t.Fatalf("vendor name too long: %q", v.Name)
 		}
+		ids[v.CompanyID] = struct{}{}
+		if v.Name == "" {
+			nameless++
+		} else {
+			named++
+		}
+	}
+	if len(ids) < 6 {
+		t.Fatalf("too few distinct company IDs for diversity: %d (want >= 6)", len(ids))
+	}
+	if named == 0 || nameless == 0 {
+		t.Fatalf("want a mix of named and nameless entries, got named=%d nameless=%d", named, nameless)
 	}
 }
 
