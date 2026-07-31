@@ -12,10 +12,10 @@ var errUnsupported = errors.New("splinterd HCI transport requires Linux")
 // Conn is a non-Linux stub with the same method set as the Linux transport.
 type Conn struct{}
 
-func New(index int) (*Conn, error)                          { return nil, errUnsupported }
-func (c *Conn) Close() error                                { return errUnsupported }
-func (c *Conn) Reset() error                                { return errUnsupported }
-func (c *Conn) SetAdvEnable(on bool) error                  { return errUnsupported }
-func (c *Conn) SetRandomAddr(a [6]byte) error               { return errUnsupported }
+func New(index int) (*Conn, error)                             { return nil, errUnsupported }
+func (c *Conn) Close() error                                   { return errUnsupported }
+func (c *Conn) Reset() error                                   { return errUnsupported }
+func (c *Conn) SetAdvEnable(on bool) error                     { return errUnsupported }
+func (c *Conn) SetRandomAddr(a [6]byte) error                  { return errUnsupported }
 func (c *Conn) SetAdvParams(minMs, maxMs uint16, t byte) error { return errUnsupported }
-func (c *Conn) SetAdvData(ad []byte) error                  { return errUnsupported }
+func (c *Conn) SetAdvData(ad []byte) error                     { return errUnsupported }
