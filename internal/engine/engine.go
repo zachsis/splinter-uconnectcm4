@@ -80,13 +80,17 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 	}
 }
 
-// cycle mints and starts one decoy. On any HCI error it returns immediately
-// without running the remaining steps, bounding a wedged-controller stall to a
-// single read timeout.
+// cycle mints and starts one decoy. On any HCI error after the leading disable
+// it returns immediately without running the remaining steps, bounding a
+// wedged-controller stall to a single read timeout.
+//
+// The leading SetAdvEnable(false) is best-effort: its sole purpose is to permit
+// the random-address change, and disabling advertising that is already disabled
+// is rejected by some controllers (e.g. the CYW43455 returns "Command
+// Disallowed"). A genuine failure to disable while advertising is active surfaces
+// on the next command (SetRandomAddr is illegal while advertising).
 func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand) error {
-	if err := ctrl.SetAdvEnable(false); err != nil {
-		return err
-	}
+	_ = ctrl.SetAdvEnable(false)
 	addr := decoy.RandomStaticAddr(rng)
 	if err := ctrl.SetRandomAddr(addr); err != nil {
 		return err

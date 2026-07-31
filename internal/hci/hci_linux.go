@@ -58,7 +58,26 @@ func New(index int) (*Conn, error) {
 		c.Close()
 		return nil, fmt.Errorf("hci reset: %w", err)
 	}
+	// On the user channel the kernel does no controller initialization, so we
+	// must do it ourselves — otherwise a dual-mode controller (e.g. CYW43455)
+	// accepts advertising params/data/address but refuses LE Set Advertise
+	// Enable with "Command Disallowed" (0x0c). These mirror the LE-relevant
+	// parts of the kernel's own bring-up; best-effort (ignore unsupported bits).
+	c.initController()
 	return c, nil
+}
+
+// initController performs the minimal LE bring-up the kernel normally does on a
+// managed adapter. Best-effort: individual commands may be unsupported.
+func (c *Conn) initController() {
+	// Write LE Host Supported (OGF 0x03, OCF 0x006D): LE on, simultaneous off.
+	_, _ = c.sendCommand(0x03, 0x006D, []byte{0x01, 0x00})
+	// Set Event Mask (OGF 0x03, OCF 0x0001): default mask incl. LE Meta event.
+	_, _ = c.sendCommand(0x03, 0x0001, []byte{0xFF, 0xFF, 0xFB, 0xFF, 0x07, 0xF8, 0xBF, 0x3D})
+	// LE Set Event Mask (OGF 0x08, OCF 0x0001): enable LE events.
+	_, _ = c.sendCommand(0x08, 0x0001, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
+	// LE Read Buffer Size (OGF 0x08, OCF 0x0002): part of standard bring-up.
+	_, _ = c.sendCommand(0x08, 0x0002, nil)
 }
 
 // Close disables advertising (best-effort, bounded), releases the user channel,
