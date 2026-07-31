@@ -111,6 +111,8 @@ func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func()) {
 			if rate != nil {
 				m.SetRate(rate.Adjust(+rateStepMs)) // longer interval = slower
 			}
+		case 't', 'T':
+			m.CycleTheme()
 		}
 	}
 }

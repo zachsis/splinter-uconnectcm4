@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -37,6 +38,12 @@ func main() {
 		return // usage already printed by the flag package
 	case err != nil:
 		fmt.Fprintln(os.Stderr, "splinterd:", err)
+		os.Exit(2)
+	}
+
+	if !dashboard.ValidTheme(cfg.Theme) {
+		fmt.Fprintf(os.Stderr, "splinterd: unknown --theme %q (valid: %s)\n",
+			cfg.Theme, strings.Join(dashboard.ThemeNames(), ", "))
 		os.Exit(2)
 	}
 
@@ -128,6 +135,8 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 			defer runCancel()
 
 			m := dashboard.New(mode, cfg.AdvMs, cfg.RotateMs)
+			m.SetColor(dashboard.ColorEnabled())
+			m.UseTheme(cfg.Theme)
 			rate := engine.NewRateControl(cfg.RotateMs, cfg.AdvMs, 2000)
 			done := make(chan struct{})
 			go func() {
