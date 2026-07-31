@@ -103,6 +103,28 @@ func TestBlockGraph(t *testing.T) {
 	}
 }
 
+func TestCrowdTable(t *testing.T) {
+	vs := []VendorCount{{0x0075, 33}, {0x0087, 12}, {0x012D, 8}, {0x0059, 5}, {0x0171, 3}}
+	tbl := crowdTable(vs, 40, 3)
+	if len(tbl) != 4 { // 3 rows + a "… +2 more" line
+		t.Fatalf("want 3 rows + more-line, got %d: %v", len(tbl), tbl)
+	}
+	if !strings.Contains(tbl[0], "Samsung") || !strings.Contains(tbl[0], "33") {
+		t.Errorf("first row wrong: %q", tbl[0])
+	}
+	if !strings.Contains(tbl[len(tbl)-1], "+2 more") {
+		t.Errorf("truncation line wrong: %q", tbl[len(tbl)-1])
+	}
+	// The top vendor's bar is the longest.
+	if b0, b1 := strings.Count(tbl[0], "█"), strings.Count(tbl[1], "█"); b0 <= b1 {
+		t.Errorf("top bar (%d) should exceed second (%d)", b0, b1)
+	}
+	// Empty -> a warming-up placeholder, not a crash.
+	if e := crowdTable(nil, 40, 3); len(e) != 1 || !strings.Contains(e[0], "warming") {
+		t.Errorf("empty case: %v", e)
+	}
+}
+
 func TestRenderFrameNarrow(t *testing.T) {
 	m := New("paced", 100, 250)
 	m.Rate(4, 0)
