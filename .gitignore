@@ -1,0 +1,6 @@
+# Build artifacts
+/dist/
+*.test
+*.out
+# Local project tracking (not part of the repo)
+PROJECT_PROGRESS.md

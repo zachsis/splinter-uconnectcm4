@@ -1,0 +1,50 @@
+package hci
+
+import "encoding/binary"
+
+// Bluetooth management (mgmt) API framing — a separate protocol from HCI
+// commands, spoken on the HCI_CHANNEL_CONTROL socket. Used only to power the
+// controller down (to free it for the user channel) and back up on exit.
+const (
+	mgmtOpReadInfo    = 0x0004
+	mgmtOpSetPowered  = 0x0005
+	mgmtEvCmdComplete = 0x0001
+	mgmtEvCmdStatus   = 0x0002
+
+	hciDevNone = 0xFFFF // bind index for the control socket
+)
+
+// mgmtCommand frames a management command: [opcode LE][index LE][len LE][params].
+func mgmtCommand(op uint16, index uint16, params []byte) []byte {
+	buf := make([]byte, 6+len(params))
+	binary.LittleEndian.PutUint16(buf[0:2], op)
+	binary.LittleEndian.PutUint16(buf[2:4], index)
+	binary.LittleEndian.PutUint16(buf[4:6], uint16(len(params)))
+	copy(buf[6:], params)
+	return buf
+}
+
+// parseMgmtCmdComplete inspects a management event frame and, if it is a Command
+// Complete for wantOp, returns its status. matched is false for other events.
+func parseMgmtCmdComplete(pkt []byte, wantOp uint16) (status byte, matched bool, ok bool) {
+	// [0:2]=event, [2:4]=index, [4:6]=len, then for CMD_COMPLETE: [6:8]=cmd_op, [8]=status
+	if len(pkt) < 9 {
+		return 0, false, len(pkt) >= 6 // short-but-valid header => keep reading
+	}
+	ev := binary.LittleEndian.Uint16(pkt[0:2])
+	if ev != mgmtEvCmdComplete {
+		return 0, false, true
+	}
+	if binary.LittleEndian.Uint16(pkt[6:8]) != wantOp {
+		return 0, false, true
+	}
+	return pkt[8], true, true
+}
+
+// setPoweredParam is the 1-byte payload for MGMT_OP_SET_POWERED.
+func setPoweredParam(on bool) []byte {
+	if on {
+		return []byte{0x01}
+	}
+	return []byte{0x00}
+}
