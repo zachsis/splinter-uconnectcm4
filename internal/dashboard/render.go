@@ -145,6 +145,6 @@ func RenderFrame(s Snapshot, width, height int) string {
 		fmt.Fprintf(&b, "  now    %s  %q  %s\n\n", macStr(s.LastAddr), name, companyLabel(s.LastID))
 	}
 	fmt.Fprintf(&b, "  crowd  %s\n\n", crowd(s.Vendors, width-9))
-	b.WriteString("  Ctrl-C to quit\n")
+	b.WriteString("  +/- rate  ·  q/Ctrl-C quit\n")
 	return b.String()
 }

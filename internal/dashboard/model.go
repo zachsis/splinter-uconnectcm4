@@ -31,6 +31,20 @@ type Model struct {
 	rotateMs   int
 }
 
+// RateAdjuster is the subset of engine.RateControl the dashboard needs to show
+// and change the live rotation interval. *engine.RateControl satisfies it.
+type RateAdjuster interface {
+	Millis() int
+	Adjust(deltaMs int) int
+}
+
+// SetRate updates the displayed rotation interval (called when a hotkey changes it).
+func (m *Model) SetRate(rotateMs int) {
+	m.mu.Lock()
+	m.rotateMs = rotateMs
+	m.mu.Unlock()
+}
+
 // New returns a Model for the given run mode and advertising settings.
 func New(mode string, advMs, rotateMs int) *Model {
 	return &Model{

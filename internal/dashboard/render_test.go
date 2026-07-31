@@ -34,7 +34,7 @@ func TestRenderFrame(t *testing.T) {
 	f := RenderFrame(m.Snapshot(), 90, 24)
 	for _, want := range []string{
 		"splinterd", "dense", "adv 100ms", "dwell 200ms",
-		"rate", "fails", "Galaxy Buds", "Samsung", "crowd", "Ctrl-C to quit",
+		"rate", "fails", "Galaxy Buds", "Samsung", "crowd", "+/- rate", "quit",
 	} {
 		if !strings.Contains(f, want) {
 			t.Errorf("frame missing %q:\n%s", want, f)
