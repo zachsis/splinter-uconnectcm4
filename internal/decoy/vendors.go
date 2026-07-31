@@ -18,22 +18,51 @@ const (
 )
 
 // Vendors is an independently-curated palette of real Bluetooth SIG company
-// identifiers (from the public assigned-numbers registry) with plausible
-// consumer-audio/wearable names. Extend from the registry for a denser crowd:
+// identifiers (from the public assigned-numbers registry) paired with plausible
+// product-style names, spread across device categories so the decoy crowd
+// resembles a real environment. The company IDs are facts from the registry;
+// extend/verify against it for an even denser crowd:
 //
 //	https://www.bluetooth.com/specifications/assigned-numbers/
 //
 // Deliberately excludes CompanyApple, CompanyMicrosoft, and never uses the
-// Google Fast Pair service-data shape.
+// Google Fast Pair service-data shape. Names are ≤ 12 chars; a mix are nameless.
 var Vendors = []Vendor{
+	// --- audio: earbuds / headphones / speakers ---
 	{0x0075, "Galaxy Buds"}, // Samsung Electronics
 	{0x00E0, "Pixel Buds"},  // Google
 	{0x009E, "SoundLink"},   // Bose Corporation
-	{0x0087, "Forerunner"},  // Garmin International
+	{0x009E, "QC Ultra"},    // Bose (headphones)
 	{0x012D, "LinkBuds"},    // Sony Corporation
+	{0x012D, "WH-1000"},     // Sony (headphones)
+	{0x0171, "Echo Buds"},   // Amazon.com Services
+
+	// --- watches / fitness bands ---
+	{0x0087, "Forerunner"},  // Garmin International
+	{0x0087, "Venu"},        // Garmin (watch)
 	{0x0157, "Amazfit"},     // Anhui Huami
-	{0x0059, ""},            // Nordic Semiconductor (nameless sensor)
-	{0x0171, ""},            // Amazon.com Services (nameless)
-	{0x0075, ""},            // Samsung (nameless wearable)
-	{0x0087, "vivo band"},   // Garmin (band)
+	{0x0157, "Zepp"},        // Anhui Huami (band)
+	{0x038F, "Mi Band"},     // Xiaomi
+	{0x038F, "Redmi Watch"}, // Xiaomi
+
+	// --- item trackers / tags / sensors ---
+	{0x0059, ""},         // Nordic Semiconductor (nameless sensor)
+	{0x0059, "Beacon"},   // Nordic (beacon)
+	{0x0499, "RuuviTag"}, // Ruuvi Innovations
+	{0x0131, ""},         // Cypress/Infineon (nameless tag)
+	{0x0171, ""},         // Amazon (nameless)
+
+	// --- phones / tablets ---
+	{0x0075, "Galaxy S"}, // Samsung
+	{0x00E0, "Pixel"},    // Google
+	{0x038F, "Redmi"},    // Xiaomi
+
+	// --- car / automotive BLE ---
+	{0x0087, "Drive"}, // Garmin (automotive nav)
+	{0x0075, ""},      // Samsung (nameless car kit)
+
+	// --- laptops / peripherals / dev boards ---
+	{0x00E0, ""},      // Google (nameless)
+	{0x012D, ""},      // Sony (nameless)
+	{0x0059, "nRF52"}, // Nordic (dev board)
 }
