@@ -46,6 +46,8 @@ func TestParseInvalid(t *testing.T) {
 		{"--mfg-prob", "-1"},
 		{"--rotate-ms", "-5"},
 		{"--hci", "-1"},
+		{"--dense", "--benchmark"}, // mutually exclusive
+		{"--adverts-per-id", "0"},  // must be >= 1
 	}
 	for _, args := range cases {
 		if _, err := Parse("splinterd", args, io.Discard); err == nil {

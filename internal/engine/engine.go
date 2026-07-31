@@ -39,6 +39,11 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 	if err := ctrl.SetAdvParams(min, max, hci.AdvNonconnInd); err != nil {
 		return fmt.Errorf("set adv params: %w", err)
 	}
+	// Guardrail: an identity that rotates before it advertises is never seen.
+	if cfg.RotateMs < cfg.AdvMs {
+		log.Warn("rotate-ms < adv-ms: decoys rotate before transmitting and won't be visible to scanners",
+			"rotate_ms", cfg.RotateMs, "adv_ms", cfg.AdvMs)
+	}
 	defer func() { _ = ctrl.SetAdvEnable(false) }()
 
 	if cfg.Benchmark {
