@@ -14,10 +14,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/zachsis/splinter-uconnectcm4/internal/config"
 	"github.com/zachsis/splinter-uconnectcm4/internal/engine"
 	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
+	"github.com/zachsis/splinter-uconnectcm4/internal/tune"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -66,7 +68,33 @@ func run(cfg config.Config) error {
 	defer stop()
 
 	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex)
+	if cfg.Benchmark {
+		return runBenchmark(ctx, conn, cfg, log)
+	}
 	return engine.Run(ctx, conn, cfg, log)
+}
+
+// runBenchmark probes advertising intervals for a bounded window and prints the
+// recommended visibility-optimal settings, then returns (it does not advertise
+// indefinitely).
+func runBenchmark(ctx context.Context, conn engine.Controller, cfg config.Config, log *slog.Logger) error {
+	dur := cfg.Duration
+	if dur <= 0 {
+		dur = 10 * time.Second
+	}
+	candidates := tune.AggressiveCandidates
+	per := dur / time.Duration(len(candidates))
+	log.Info("calibrating", "duration", dur.String(), "candidates_ms", candidates)
+
+	probes := engine.Calibrate(ctx, conn, cfg, candidates, per, log)
+	rec, ok := tune.Recommend(probes, 2)
+	if !ok {
+		log.Warn("no calibration data collected")
+		return nil
+	}
+	log.Info("recommended settings", "flags", rec.String(),
+		"note", "estimate is model-based (TX-side); confirm real capture with splinter-verify on a 2nd device")
+	return nil
 }
 
 func newLogger(verbose bool) *slog.Logger {
