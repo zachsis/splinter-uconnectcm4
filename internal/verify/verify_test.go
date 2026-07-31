@@ -2,12 +2,28 @@ package verify
 
 import (
 	"math/rand/v2"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/zachsis/splinter-uconnectcm4/internal/config"
 	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
 )
+
+func TestResultString(t *testing.T) {
+	fail := Analyze([]Observation{{MAC: mac(1), HasMfg: true, CompanyID: decoy.CompanyApple}}, time.Second, 0).String()
+	if !strings.Contains(fail, "FAIL") || !strings.Contains(fail, "VIOLATION") {
+		t.Fatalf("expected FAIL + VIOLATION, got:\n%s", fail)
+	}
+	obs := []Observation{
+		{MAC: mac(1), HasMfg: true, CompanyID: 0x0075},
+		{MAC: mac(2), HasMfg: true, CompanyID: 0x00E0},
+	}
+	pass := Analyze(obs, 10*time.Second, 0).String()
+	if !strings.Contains(pass, "PASS") || !strings.Contains(pass, "vendor 0x0075") {
+		t.Fatalf("expected PASS + histogram, got:\n%s", pass)
+	}
+}
 
 // TestParseRoundTrip feeds decoy-built payloads back through the parser and
 // checks the fields agree.

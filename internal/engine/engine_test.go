@@ -84,6 +84,22 @@ func TestCycleAbortsOnError(t *testing.T) {
 	}
 }
 
+func TestRunPacedStopsOnCtx(t *testing.T) {
+	f := &fakeCtrl{}
+	cfg := config.Default()
+	cfg.RotateMs = 5 // fast paced mode (exercises the non-benchmark wait branch)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+
+	if err := Run(ctx, f, cfg, quietLog()); err != nil {
+		t.Fatal(err)
+	}
+	calls := f.snapshot()
+	if len(calls) == 0 || calls[len(calls)-1] != "disable" {
+		t.Fatalf("expected deferred disable last, got %v", calls)
+	}
+}
+
 func TestRunSetsParamsOnceAndDisablesOnExit(t *testing.T) {
 	f := &fakeCtrl{}
 	cfg := config.Default()
