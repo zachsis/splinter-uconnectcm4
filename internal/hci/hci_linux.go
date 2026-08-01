@@ -37,9 +37,10 @@ func New(index int) (*Conn, error) {
 	}
 	c := &Conn{userFd: -1, ctrlFd: ctrl, index: index}
 
-	// Power down and BLOCK on the mgmt Command Complete — binding the user
-	// channel before the async power-down finishes races the kernel (EBUSY).
-	if err := c.mgmtSetPowered(false); err != nil {
+	// Power down and BLOCK on the mgmt reply — binding the user channel before the
+	// async power-down finishes races the kernel (EBUSY). Retry briefly if the
+	// controller is momentarily Busy (bluetoothd finishing a connection/scan).
+	if err := c.powerDownWithRetry(); err != nil {
 		c.Close()
 		return nil, fmt.Errorf("powering hci%d down: %w", index, err)
 	}
@@ -194,8 +195,26 @@ func (c *Conn) sendCommand(ogf, ocf uint16, params []byte) (byte, error) {
 	return 0, fmt.Errorf("deadline awaiting reply to opcode %#04x", want)
 }
 
+// errMgmtBusy means Set Powered failed because the controller is busy right now
+// (bluetoothd has an active connection or operation). It usually clears shortly.
+var errMgmtBusy = errors.New("controller busy (a Bluetooth device may be connected)")
+
+// powerDownWithRetry powers the controller off, retrying briefly if it reports
+// Busy so a transient bluetoothd operation doesn't fail the takeover.
+func (c *Conn) powerDownWithRetry() error {
+	var err error
+	for attempt := 0; attempt < 6; attempt++ {
+		err = c.mgmtSetPowered(false)
+		if !errors.Is(err, errMgmtBusy) {
+			return err // success, or a non-busy error we shouldn't retry
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	return fmt.Errorf("%w — disconnect it (bluetoothctl disconnect) and retry", err)
+}
+
 // mgmtSetPowered powers the controller on/off via the mgmt socket and blocks on
-// the matching Command Complete.
+// the matching Command Complete/Status. A Busy status returns errMgmtBusy.
 func (c *Conn) mgmtSetPowered(on bool) error {
 	cmd := mgmtCommand(mgmtOpSetPowered, uint16(c.index), setPoweredParam(on))
 	if _, err := unix.Write(c.ctrlFd, cmd); err != nil {
@@ -213,7 +232,10 @@ func (c *Conn) mgmtSetPowered(on bool) error {
 		}
 		status, matched, _ := parseMgmtCmdComplete(buf[:n], mgmtOpSetPowered)
 		if matched {
-			if status != 0 {
+			switch {
+			case status == MgmtStatusBusy:
+				return errMgmtBusy
+			case status != 0:
 				return fmt.Errorf("mgmt set-powered failed, status %#02x", status)
 			}
 			return nil
