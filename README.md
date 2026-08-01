@@ -88,6 +88,7 @@ splinterd [flags]
 | `--hci` | 0 | HCI device index to drive (`hciX`) |
 | `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or under systemd) |
 | `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `mono` (honors `NO_COLOR`) |
+| `--learn-window` | 15s | learn-mode passive scan window (dashboard `l` key) |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
@@ -119,9 +120,17 @@ histogram) instead of scrolling log lines — think `mtr`. It needs an interacti
 terminal; when stdout isn't a TTY (piped, or under systemd) it automatically falls
 back to line logging.
 
-Dashboard **hotkeys**: `+`/`-` raise/lower the live rate (clamped to the visibility
-floor), `t` cycles the color theme, and `q` (or Ctrl-C) quits. Pick a starting
-palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
+The dashboard shows a **multi-row rate graph**, a compact fails sparkline, the
+current fake identity, and an **htop-style vendor "crowd" table** (name · bar ·
+count). **Hotkeys**: `+`/`-` raise/lower the live rate (clamped to the visibility
+floor), `t` cycles the color theme, `l` runs **learn mode**, and `q` (or Ctrl-C)
+quits. Pick a starting palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
+
+**Learn mode** (`l`): pauses advertising, passively scans nearby BLE for
+`--learn-window` (default 15 s), and then **weights the decoys toward the vendor
+mix actually around you** (phones, tags, watches, car sensors) so the fakes blend
+in. It never replays real devices' addresses/payloads — it just biases which of
+its own vendor decoys it mints. Press `l` again to re-scan.
 
 On the uConsole's **CYW43455**, non-connectable advertising is floored at **100 ms**
 (the legacy `ADV_NONCONN_IND` minimum — the chip rejects lower), so `--dense`
