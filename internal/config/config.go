@@ -18,6 +18,7 @@ type Config struct {
 	AdvertsPerID int           // advertising events per identity before rotating (dense dwell multiplier)
 	Dashboard    bool          // live mtr-style terminal dashboard instead of line logs
 	Theme        string        // dashboard color theme name
+	LearnWindow  time.Duration // learn-mode passive scan window
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }
@@ -32,6 +33,7 @@ func Default() Config {
 		Benchmark:    false,
 		AdvertsPerID: 2,
 		Theme:        "matrix",
+		LearnWindow:  15 * time.Second,
 		HCIIndex:     0,
 		Verbose:      false,
 	}

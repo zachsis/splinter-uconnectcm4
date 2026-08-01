@@ -29,6 +29,7 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.IntVar(&cfg.AdvertsPerID, "adverts-per-id", cfg.AdvertsPerID, "advertising events per identity before rotating (dense dwell multiplier)")
 	fs.BoolVar(&cfg.Dashboard, "dashboard", cfg.Dashboard, "live mtr-style terminal dashboard instead of line logs (needs a TTY)")
 	fs.StringVar(&cfg.Theme, "theme", cfg.Theme, "dashboard color theme: matrix|amber|neon|mono")
+	fs.DurationVar(&cfg.LearnWindow, "learn-window", cfg.LearnWindow, "learn-mode passive scan window (dashboard 'l' key)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")
