@@ -6,6 +6,8 @@ import "fmt"
 // display, falling back to the hex ID for unknown vendors.
 func CompanyLabel(id uint16) string {
 	switch id {
+	case CompanyApple:
+		return "Apple"
 	case 0x0075:
 		return "Samsung"
 	case 0x00E0:

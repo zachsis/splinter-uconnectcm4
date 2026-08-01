@@ -48,7 +48,7 @@ func (r LogReporter) Rate(devPerSec, fails int) {
 // Run drives the rotation loop until ctx is cancelled. Advertising parameters
 // are set once up front; each cycle then disables advertising, mints a fresh
 // random MAC + decoy payload, and re-enables. On return, advertising is disabled.
-func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl) error {
+func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl, apple *AppleControl) error {
 	rng := newRNG()
 
 	if rate == nil {
@@ -105,11 +105,14 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 			learn.setLearning(false)
 		}
 
-		var weights []int
-		if learn != nil {
-			weights = learn.weightsSnapshot()
+		opts := decoy.Options{AppleShare: cfg.AppleShare}
+		if apple != nil {
+			opts.Apple = apple.Kind()
 		}
-		addr, d, err := cycle(ctrl, cfg, rng, weights)
+		if learn != nil {
+			opts.Weights = learn.weightsSnapshot()
+		}
+		addr, d, err := cycle(ctrl, cfg, rng, opts)
 		if err != nil {
 			fail++
 			if cfg.Verbose {
@@ -157,7 +160,7 @@ func Calibrate(ctx context.Context, ctrl Controller, cfg config.Config, candidat
 		var ok, fail int
 		deadline := time.Now().Add(perCandidate)
 		for time.Now().Before(deadline) && ctx.Err() == nil {
-			if _, _, err := cycle(ctrl, cfg, rng, nil); err != nil {
+			if _, _, err := cycle(ctrl, cfg, rng, decoy.Options{}); err != nil {
 				fail++
 			} else {
 				ok++
@@ -181,13 +184,13 @@ func Calibrate(ctx context.Context, ctrl Controller, cfg config.Config, candidat
 // is rejected by some controllers (e.g. the CYW43455 returns "Command
 // Disallowed"). A genuine failure to disable while advertising is active surfaces
 // on the next command (SetRandomAddr is illegal while advertising).
-func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand, weights []int) ([6]byte, decoy.Decoy, error) {
+func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand, opts decoy.Options) ([6]byte, decoy.Decoy, error) {
 	_ = ctrl.SetAdvEnable(false)
 	addr := decoy.RandomStaticAddr(rng)
 	if err := ctrl.SetRandomAddr(addr); err != nil {
 		return addr, decoy.Decoy{}, err
 	}
-	d := decoy.BuildWeighted(cfg, rng, weights)
+	d := decoy.BuildWithOpts(cfg, rng, opts)
 	if err := ctrl.SetAdvData(d.AD); err != nil {
 		return addr, decoy.Decoy{}, err
 	}

@@ -88,7 +88,25 @@ func Build(cfg config.Config, rng *rand.Rand) Decoy {
 // to Vendors; nil/invalid => uniform). Used by learn mode to blend into the
 // observed vendor mix.
 func BuildWeighted(cfg config.Config, rng *rand.Rand, weights []int) Decoy {
-	return buildFor(cfg, rng, Vendors[pickVendor(rng, weights)])
+	return BuildWithOpts(cfg, rng, Options{Weights: weights})
+}
+
+// Options selects which payload kinds a decoy may take. The zero value emits
+// only manufacturer-data vendor decoys (the original behavior).
+type Options struct {
+	Weights    []int     // vendor weighting (learn mode); nil/invalid => uniform
+	Apple      AppleKind // Apple impersonation mode
+	AppleShare int       // % chance an eligible decoy impersonates Apple (Apple != off)
+}
+
+// BuildWithOpts generates one decoy, choosing its payload kind per opts: an
+// Apple decoy with probability AppleShare when Apple impersonation is enabled,
+// otherwise a weighted manufacturer-data vendor decoy.
+func BuildWithOpts(cfg config.Config, rng *rand.Rand, opts Options) Decoy {
+	if opts.Apple != AppleOff && opts.AppleShare > 0 && rng.IntN(100) < opts.AppleShare {
+		return buildApple(rng, opts.Apple)
+	}
+	return buildFor(cfg, rng, Vendors[pickVendor(rng, opts.Weights)])
 }
 
 // buildFor serializes one decoy for a chosen vendor: Flags, an optional vendor

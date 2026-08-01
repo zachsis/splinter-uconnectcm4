@@ -21,12 +21,13 @@ type Observation struct {
 	HasMfg      bool
 	Name        string
 	FastPair    bool // carried a Google Fast Pair (0xFE2C) service-data block
+	AppleFindMy bool // carried an Apple Find My / offline-finding (0x12) message
 }
 
 // ParseAdvData walks a raw advertising payload and extracts the fields the
 // harness cares about. Malformed structures are skipped rather than erroring —
 // the scanner sees real-world traffic, not just splinterd's.
-func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fastPair bool) {
+func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fastPair bool, appleFindMy bool) {
 	for i := 0; i < len(data); {
 		l := int(data[i])
 		if l == 0 || i+1+l > len(data) {
@@ -41,6 +42,9 @@ func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fast
 			if len(body) >= 2 {
 				companyID = uint16(body[0]) | uint16(body[1])<<8
 				hasMfg = true
+				if companyID == decoy.CompanyApple && hasAppleMsgType(body[2:], decoy.AppleFindMyType) {
+					appleFindMy = true
+				}
 			}
 		case 0x16: // service data - 16-bit UUID
 			if len(body) >= 2 {
@@ -53,6 +57,24 @@ func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fast
 		i += 1 + l
 	}
 	return
+}
+
+// hasAppleMsgType reports whether the Apple Continuity payload (the bytes after
+// the 0x004C company ID) contains a message of the given type. Continuity packs
+// [type][len][payload...] messages back-to-back. The type byte is inspected at
+// every message boundary, including a lone trailing type byte with no length,
+// so a Find My type in the final position can't slip past the detector.
+func hasAppleMsgType(payload []byte, msgType byte) bool {
+	for i := 0; i < len(payload); {
+		if payload[i] == msgType {
+			return true
+		}
+		if i+1 >= len(payload) {
+			break // trailing type byte with no length; already checked above
+		}
+		i += 2 + int(payload[i+1])
+	}
+	return false
 }
 
 // Result is the outcome of analyzing a scan window.
@@ -77,12 +99,15 @@ func Analyze(obs []Observation, window time.Duration, expectedRotateMs int) Resu
 	r := Result{Window: window, Total: len(obs), IDHistogram: map[uint16]int{}}
 
 	macs := map[[6]byte]struct{}{}
-	var connectable, fastpair, excluded int
+	var connectable, fastpair, excluded, findmy int
 	for _, o := range obs {
 		macs[o.MAC] = struct{}{}
 		if o.HasMfg {
 			r.IDHistogram[o.CompanyID]++
-			if o.CompanyID == decoy.CompanyApple || o.CompanyID == decoy.CompanyMicrosoft {
+			// Microsoft (Swift Pair) still pops a pairing prompt on bystanders and
+			// is never emitted. Apple presence beacons are allowed (they don't pop
+			// dialogs) — but an Apple Find My frame triggers anti-stalking alerts.
+			if o.CompanyID == decoy.CompanyMicrosoft {
 				excluded++
 			}
 		}
@@ -92,12 +117,18 @@ func Analyze(obs []Observation, window time.Duration, expectedRotateMs int) Resu
 		if o.FastPair {
 			fastpair++
 		}
+		if o.AppleFindMy {
+			findmy++
+		}
 	}
 	r.DistinctMACs = len(macs)
 	r.IDSpread = len(r.IDHistogram)
 
 	if excluded > 0 {
-		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an excluded company ID (Apple/Microsoft)", excluded))
+		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an excluded company ID (Microsoft Swift Pair)", excluded))
+	}
+	if findmy > 0 {
+		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an Apple Find My (0x12) message (triggers anti-stalking alerts)", findmy))
 	}
 	if fastpair > 0 {
 		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried a Google Fast Pair service-data block", fastpair))

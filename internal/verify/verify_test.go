@@ -11,7 +11,7 @@ import (
 )
 
 func TestResultString(t *testing.T) {
-	fail := Analyze([]Observation{{MAC: mac(1), HasMfg: true, CompanyID: decoy.CompanyApple}}, time.Second, 0).String()
+	fail := Analyze([]Observation{{MAC: mac(1), HasMfg: true, CompanyID: decoy.CompanyMicrosoft}}, time.Second, 0).String()
 	if !strings.Contains(fail, "FAIL") || !strings.Contains(fail, "VIOLATION") {
 		t.Fatalf("expected FAIL + VIOLATION, got:\n%s", fail)
 	}
@@ -32,7 +32,7 @@ func TestParseRoundTrip(t *testing.T) {
 	rng := rand.New(rand.NewPCG(5, 6))
 	for i := 0; i < 20000; i++ {
 		ad := decoy.BuildAdvData(cfg, rng)
-		id, hasMfg, name, fastPair := ParseAdvData(ad)
+		id, hasMfg, name, fastPair, _ := ParseAdvData(ad)
 		if fastPair {
 			t.Fatalf("decoy payload should never look like Fast Pair: %x", ad)
 		}
@@ -46,6 +46,26 @@ func TestParseRoundTrip(t *testing.T) {
 }
 
 func mac(b byte) [6]byte { return [6]byte{b, b, b, b, b, 0xC0} }
+
+func TestParseAppleFindMy(t *testing.T) {
+	// A crafted Apple advert carrying a Find My (0x12) message must be detected.
+	findMy := []byte{0x02, 0x01, 0x06, 0x06, 0xFF, 0x4C, 0x00, 0x12, 0x02, 0xAA, 0xBB}
+	if _, _, _, _, isFindMy := ParseAdvData(findMy); !isFindMy {
+		t.Fatalf("expected Find My detection for % x", findMy)
+	}
+	// A real Nearby Info decoy (nearform) must NOT be flagged as Find My.
+	rng := rand.New(rand.NewPCG(9, 10))
+	for i := 0; i < 500; i++ {
+		ad := decoy.BuildWithOpts(config.Default(), rng, decoy.Options{Apple: decoy.AppleNearform, AppleShare: 100}).AD
+		id, hasMfg, _, _, isFindMy := ParseAdvData(ad)
+		if !hasMfg || id != decoy.CompanyApple {
+			t.Fatalf("expected Apple mfg advert, got id=%#04x hasMfg=%v", id, hasMfg)
+		}
+		if isFindMy {
+			t.Fatalf("Nearby Info decoy wrongly flagged as Find My: % x", ad)
+		}
+	}
+}
 
 func TestAnalyzeCleanPass(t *testing.T) {
 	var obs []Observation
@@ -63,16 +83,34 @@ func TestAnalyzeCleanPass(t *testing.T) {
 
 func TestAnalyzeGuardrailViolations(t *testing.T) {
 	obs := []Observation{
-		{MAC: mac(1), HasMfg: true, CompanyID: decoy.CompanyApple},
-		{MAC: mac(2), Connectable: true},
-		{MAC: mac(3), FastPair: true},
+		{MAC: mac(1), HasMfg: true, CompanyID: decoy.CompanyMicrosoft},                // Swift Pair popup
+		{MAC: mac(2), Connectable: true},                                              // connectable
+		{MAC: mac(3), FastPair: true},                                                 // Fast Pair service data
+		{MAC: mac(4), HasMfg: true, CompanyID: decoy.CompanyApple, AppleFindMy: true}, // anti-stalking alert
 	}
 	r := Analyze(obs, time.Second, 0)
 	if r.Pass {
 		t.Fatalf("expected fail, got pass: %s", r)
 	}
-	if len(r.Violations) != 3 {
-		t.Fatalf("expected 3 violations, got %d: %v", len(r.Violations), r.Violations)
+	if len(r.Violations) != 4 {
+		t.Fatalf("expected 4 violations, got %d: %v", len(r.Violations), r.Violations)
+	}
+}
+
+// TestAnalyzeAppleAllowed confirms the relaxed guardrail: a plain Apple presence
+// beacon (naive or Nearby Info, not Find My) is no longer a violation.
+func TestAnalyzeAppleAllowed(t *testing.T) {
+	var obs []Observation
+	for i := 0; i < 40; i++ {
+		id := uint16(0x0075 + i%3)
+		if i%3 == 2 {
+			id = decoy.CompanyApple // mix Apple presence beacons into the crowd
+		}
+		obs = append(obs, Observation{MAC: mac(byte(i)), HasMfg: true, CompanyID: id})
+	}
+	r := Analyze(obs, 10*time.Second, 250)
+	if !r.Pass {
+		t.Fatalf("Apple presence beacons should be allowed, got: %s", r)
 	}
 }
 

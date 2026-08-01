@@ -132,7 +132,7 @@ func learnBoost(obs int) int {
 func learnWeights(reports []hci.AdvReport) ([]int, string) {
 	obs := map[uint16]int{}
 	for _, r := range reports {
-		if id, hasMfg, _, _ := verify.ParseAdvData(r.Data); hasMfg {
+		if id, hasMfg, _, _, _ := verify.ParseAdvData(r.Data); hasMfg {
 			obs[id]++
 		}
 	}

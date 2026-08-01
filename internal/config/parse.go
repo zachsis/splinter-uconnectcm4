@@ -30,6 +30,8 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.BoolVar(&cfg.Dashboard, "dashboard", cfg.Dashboard, "live mtr-style terminal dashboard instead of line logs (needs a TTY)")
 	fs.StringVar(&cfg.Theme, "theme", cfg.Theme, "dashboard color theme: matrix|amber|neon|mono")
 	fs.DurationVar(&cfg.LearnWindow, "learn-window", cfg.LearnWindow, "learn-mode passive scan window (dashboard 'l' key)")
+	fs.StringVar(&cfg.AppleMode, "apple-mode", cfg.AppleMode, "Apple decoy mode: off|naive|nearform (alias: nearby-info) (dashboard 'a' cycles live)")
+	fs.IntVar(&cfg.AppleShare, "apple-share", cfg.AppleShare, "percent of decoys that impersonate Apple when apple-mode != off (0-100)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")
@@ -72,6 +74,14 @@ func (c Config) Validate() error {
 	}
 	if c.AdvertsPerID < 1 {
 		return fmt.Errorf("--adverts-per-id must be >= 1, got %d", c.AdvertsPerID)
+	}
+	switch c.AppleMode {
+	case "off", "naive", "nearform", "nearby-info":
+	default:
+		return fmt.Errorf("--apple-mode must be off|naive|nearform (alias: nearby-info), got %q", c.AppleMode)
+	}
+	if c.AppleShare < 0 || c.AppleShare > 100 {
+		return fmt.Errorf("--apple-share must be 0..100, got %d", c.AppleShare)
 	}
 	return nil
 }
