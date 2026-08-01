@@ -53,13 +53,48 @@ type Decoy struct {
 	Name      string // the advertised name, or "" if none was emitted
 }
 
-// Build generates one decoy: Flags, an optional vendor name, and optional vendor
-// manufacturer data. One vendor is chosen per call; both the name and the company
-// ID come from that same vendor. The payload is never shaped like
-// Apple/Microsoft/Google formats.
-func Build(cfg config.Config, rng *rand.Rand) Decoy {
-	v := Vendors[rng.IntN(len(Vendors))]
+// pickVendor returns a vendor index chosen by the given weights (parallel to
+// Vendors) when they are valid, otherwise uniformly at random.
+func pickVendor(rng *rand.Rand, weights []int) int {
+	if len(weights) == len(Vendors) {
+		total := 0
+		for _, w := range weights {
+			if w > 0 {
+				total += w
+			}
+		}
+		if total > 0 {
+			r := rng.IntN(total)
+			for i, w := range weights {
+				if w <= 0 {
+					continue
+				}
+				if r < w {
+					return i
+				}
+				r -= w
+			}
+		}
+	}
+	return rng.IntN(len(Vendors))
+}
 
+// Build generates one decoy with a uniformly-chosen vendor.
+func Build(cfg config.Config, rng *rand.Rand) Decoy {
+	return buildFor(cfg, rng, Vendors[rng.IntN(len(Vendors))])
+}
+
+// BuildWeighted generates one decoy with the vendor chosen by `weights` (parallel
+// to Vendors; nil/invalid => uniform). Used by learn mode to blend into the
+// observed vendor mix.
+func BuildWeighted(cfg config.Config, rng *rand.Rand, weights []int) Decoy {
+	return buildFor(cfg, rng, Vendors[pickVendor(rng, weights)])
+}
+
+// buildFor serializes one decoy for a chosen vendor: Flags, an optional vendor
+// name, and optional vendor manufacturer data. The payload is never shaped like
+// Apple/Microsoft/Google formats.
+func buildFor(cfg config.Config, rng *rand.Rand, v Vendor) Decoy {
 	buf := make([]byte, 0, AdvMaxLen)
 	buf = appendAD(buf, adFlags, []byte{flagsValue}) // always present
 

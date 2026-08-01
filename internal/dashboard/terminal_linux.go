@@ -55,17 +55,20 @@ func restoreTerm(fd int, old *unix.Termios) {
 // Run drives the dashboard: it puts the terminal into raw mode + the alternate
 // screen, reads keypresses (+/- rate, q quit), redraws ~4x/sec until ctx is
 // cancelled, then fully restores the terminal on return (including panic unwind).
-func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func()) {
+func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func(), learn LearnController) {
 	inFd := int(os.Stdin.Fd())
 	if old, err := enableRaw(inFd); err == nil {
 		defer restoreTerm(inFd, old)
-		go readKeys(ctx, m, rate, onQuit)
+		go readKeys(ctx, m, rate, onQuit, learn)
 	}
 
 	fmt.Fprint(out, "\x1b[?1049h\x1b[?25l")       // alt screen + hide cursor
 	defer fmt.Fprint(out, "\x1b[?25h\x1b[?1049l") // restore cursor + main screen
 
 	draw := func() {
+		if learn != nil {
+			m.SetLearn(learn.Learning(), learn.Summary())
+		}
 		w, h := termSize(fd)
 		fmt.Fprint(out, "\x1b[H\x1b[2J"+RenderFrame(m.Snapshot(), w, h))
 	}
@@ -85,7 +88,7 @@ func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdju
 
 // readKeys reads single keypresses and applies them until ctx is cancelled. It
 // uses a short read deadline so it can observe cancellation promptly.
-func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func()) {
+func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func(), learn LearnController) {
 	buf := make([]byte, 1)
 	for ctx.Err() == nil {
 		_ = os.Stdin.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
@@ -113,6 +116,10 @@ func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func()) {
 			}
 		case 't', 'T':
 			m.CycleTheme()
+		case 'l', 'L':
+			if learn != nil {
+				learn.Request()
+			}
 		}
 	}
 }

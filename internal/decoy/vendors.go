@@ -1,5 +1,38 @@
 package decoy
 
+import "fmt"
+
+// CompanyLabel maps a Bluetooth SIG company ID to a friendly vendor name for
+// display, falling back to the hex ID for unknown vendors.
+func CompanyLabel(id uint16) string {
+	switch id {
+	case 0x0075:
+		return "Samsung"
+	case 0x00E0:
+		return "Google"
+	case 0x009E:
+		return "Bose"
+	case 0x0087:
+		return "Garmin"
+	case 0x012D:
+		return "Sony"
+	case 0x0157:
+		return "Huami"
+	case 0x0059:
+		return "Nordic"
+	case 0x0171:
+		return "Amazon"
+	case 0x038F:
+		return "Xiaomi"
+	case 0x0499:
+		return "Ruuvi"
+	case 0x0131:
+		return "Cypress"
+	default:
+		return fmt.Sprintf("%#04x", id)
+	}
+}
+
 // Vendor pairs a Bluetooth SIG Company Identifier with an optional short product
 // name. The company ID is the spec-defined vendor signal a scanner reads from
 // manufacturer-specific data; it does NOT trigger pairing popups.

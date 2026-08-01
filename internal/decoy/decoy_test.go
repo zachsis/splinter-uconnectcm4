@@ -92,6 +92,29 @@ func TestBuildAdvDataStructure(t *testing.T) {
 	}
 }
 
+func TestBuildWeighted(t *testing.T) {
+	cfg := config.Default()
+	rng := newRNG(11, 22)
+	// Heavily weight index 2; expect its company ID to dominate.
+	weights := make([]int, len(Vendors))
+	weights[2] = 100
+	counts := map[uint16]int{}
+	for i := 0; i < 1000; i++ {
+		counts[BuildWeighted(cfg, rng, weights).CompanyID]++
+	}
+	if counts[Vendors[2].CompanyID] < 900 {
+		t.Fatalf("weighted pick not biased toward index 2 (%#04x): %v", Vendors[2].CompanyID, counts)
+	}
+	// nil weights => uniform => a spread of company IDs.
+	distinct := map[uint16]bool{}
+	for i := 0; i < 2000; i++ {
+		distinct[BuildWeighted(cfg, rng, nil).CompanyID] = true
+	}
+	if len(distinct) < 5 {
+		t.Fatalf("uniform should spread across vendors, got %d distinct", len(distinct))
+	}
+}
+
 func TestNoExcludedVendors(t *testing.T) {
 	if len(Vendors) < 25 {
 		t.Fatalf("vendor table too small for a diverse crowd: %d (want >= 25)", len(Vendors))

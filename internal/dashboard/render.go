@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
 )
 
 var blocks = []rune("▁▂▃▄▅▆▇█")
@@ -86,29 +88,8 @@ func blockGraph(samples []int, width, rows int) []string {
 	return lines
 }
 
-// companyLabel maps the vendor IDs splinter emits to friendly names for display.
-func companyLabel(id uint16) string {
-	switch id {
-	case 0x0075:
-		return "Samsung"
-	case 0x00E0:
-		return "Google"
-	case 0x009E:
-		return "Bose"
-	case 0x0087:
-		return "Garmin"
-	case 0x012D:
-		return "Sony"
-	case 0x0157:
-		return "Huami"
-	case 0x0059:
-		return "Nordic"
-	case 0x0171:
-		return "Amazon"
-	default:
-		return fmt.Sprintf("0x%04x", id)
-	}
-}
+// companyLabel maps a vendor ID to a friendly name (shared with the decoy/engine).
+func companyLabel(id uint16) string { return decoy.CompanyLabel(id) }
 
 // rateStats returns current, peak, and average from a rate history window.
 func rateStats(h []int) (cur, peak int, avg float64) {
@@ -229,6 +210,11 @@ func RenderFrame(s Snapshot, width, height int) string {
 		fmt.Fprintf(&b, "  %s    %s  %s  %s\n\n", paint(t.Label, "now"),
 			macStr(s.LastAddr), paint(t.Value, fmt.Sprintf("%q", name)), paint(t.Label, companyLabel(s.LastID)))
 	}
+	if s.LearnActive {
+		fmt.Fprintf(&b, "  %s  %s\n\n", paint(t.Warn, "learn"), "scanning ambient devices…")
+	} else if s.LearnLine != "" {
+		fmt.Fprintf(&b, "  %s  learned: %s\n\n", paint(t.Label, "learn"), s.LearnLine)
+	}
 	fmt.Fprintf(&b, "  %s\n", paint(t.Label, "crowd"))
 	crowdRows := 6
 	if height > 0 {
@@ -243,6 +229,6 @@ func RenderFrame(s Snapshot, width, height int) string {
 	for _, line := range crowdTable(s.Vendors, width-4, crowdRows) {
 		fmt.Fprintf(&b, "    %s\n", paint(t.Value, line))
 	}
-	b.WriteString("\n  " + paint(t.Dim, "+/- rate  ·  t theme  ·  q/Ctrl-C quit") + "\n")
+	b.WriteString("\n  " + paint(t.Dim, "+/- rate  ·  t theme  ·  l learn  ·  q/Ctrl-C quit") + "\n")
 	return b.String()
 }
