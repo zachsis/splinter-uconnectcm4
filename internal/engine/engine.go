@@ -91,11 +91,18 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 		if learn != nil && scanner != nil && learn.takeRequest() {
 			learn.setLearning(true)
 			_ = ctrl.SetAdvEnable(false)
-			reports, _ := scanner.Scan(learnWindow)
-			w, summary := learnWeights(reports)
-			learn.setResult(w, summary)
+			reports, err := scanner.Scan(learnWindow)
+			if err != nil {
+				// Don't silently blip: surface the failure and keep whatever
+				// weighting was already in effect rather than resetting it.
+				learn.setSummary("scan failed: " + err.Error())
+				log.Warn("learn: scan failed", "err", err)
+			} else {
+				w, summary := learnWeights(reports)
+				learn.setResult(w, summary)
+				log.Info("learn: reweighted decoys", "observed", summary)
+			}
 			learn.setLearning(false)
-			log.Info("learn: reweighted decoys", "observed", summary)
 		}
 
 		var weights []int

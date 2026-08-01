@@ -57,6 +57,45 @@ func TestLearnWeights(t *testing.T) {
 	}
 }
 
+func TestLearnBoostDampenedAndCapped(t *testing.T) {
+	if learnBoost(0) != 0 {
+		t.Fatalf("no observation should give zero boost")
+	}
+	if b := learnBoost(1); b < 1 {
+		t.Fatalf("a single observation should still register, got %d", b)
+	}
+	// sqrt-dampened: 100 observations must not be ~100x a single one.
+	if b := learnBoost(100); b > learnMaxBoost {
+		t.Fatalf("boost %d exceeds cap %d", b, learnMaxBoost)
+	}
+	// Monotonic up to the cap.
+	if learnBoost(2) < learnBoost(1) {
+		t.Fatalf("boost should be non-decreasing in observations")
+	}
+}
+
+// TestLearnWeightsCapDominance guards the core anti-skew property: even when a
+// single vendor utterly dominates the airwaves, it must not dominate the decoy
+// crowd, or the decoys become a conspicuous cluster instead of camouflage.
+func TestLearnWeightsCapDominance(t *testing.T) {
+	var reports []hci.AdvReport
+	for i := 0; i < 500; i++ { // only Samsung, and a LOT of it
+		reports = append(reports, advWithCompany(0x0075))
+	}
+	weights, _ := learnWeights(reports)
+	total, top := 0, 0
+	for _, w := range weights {
+		total += w
+		if w > top {
+			top = w
+		}
+	}
+	share := float64(top) / float64(total)
+	if share > 0.20 {
+		t.Fatalf("single dominant vendor took %.0f%% of the crowd; want <=20%%", share*100)
+	}
+}
+
 func TestLearnControlRequestAndStatus(t *testing.T) {
 	l := NewLearnControl()
 	if l.Learning() || l.Summary() != "" {

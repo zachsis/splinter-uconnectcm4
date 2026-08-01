@@ -47,6 +47,12 @@ func parseMgmtCmdComplete(pkt []byte, wantOp uint16) (status byte, matched bool,
 // powered off right now (e.g. bluetoothd has an active connection/operation).
 const MgmtStatusBusy = 0x0a
 
+// MgmtStatusPermissionDenied is returned when the process lacks the privilege
+// for a mgmt command. Opening the control socket is allowed unprivileged, but
+// commands like Set Powered need CAP_NET_ADMIN — so this surfaces as a command
+// status rather than a socket error, and almost always means "not run as root".
+const MgmtStatusPermissionDenied = 0x14
+
 // setPoweredParam is the 1-byte payload for MGMT_OP_SET_POWERED.
 func setPoweredParam(on bool) []byte {
 	if on {

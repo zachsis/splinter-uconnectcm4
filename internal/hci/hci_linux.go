@@ -141,6 +141,10 @@ func (c *Conn) SetAdvData(ad []byte) error {
 // advertising reports. Reuses this initialized transport (the same bring-up that
 // makes advertising work on the user channel), so callers get the fix for free.
 func (c *Conn) Scan(window time.Duration) ([]AdvReport, error) {
+	// Clear any lingering scan state first: this controller refuses LE Set Scan
+	// Parameters with "Command Disallowed" (0x0c) if scanning is still enabled,
+	// which otherwise makes a learn scan fail intermittently right after startup.
+	_, _ = c.sendCommand(ogfLE, ocfSetScanEnable, []byte{0x00, 0x00}) // best-effort
 	// LE Set Scan Parameters: passive, ~30ms interval/window, public addr, no filter.
 	if _, err := c.sendCommand(ogfLE, ocfSetScanParams, []byte{0x00, 0x30, 0x00, 0x30, 0x00, 0x00, 0x00}); err != nil {
 		return nil, fmt.Errorf("set scan params: %w", err)
@@ -235,6 +239,8 @@ func (c *Conn) mgmtSetPowered(on bool) error {
 			switch {
 			case status == MgmtStatusBusy:
 				return errMgmtBusy
+			case status == MgmtStatusPermissionDenied:
+				return errors.New("permission denied powering the controller — run splinterd as root (sudo) or grant it CAP_NET_ADMIN")
 			case status != 0:
 				return fmt.Errorf("mgmt set-powered failed, status %#02x", status)
 			}

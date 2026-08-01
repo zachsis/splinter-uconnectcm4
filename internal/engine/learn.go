@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -60,6 +61,14 @@ func (l *LearnControl) setResult(weights []int, summary string) {
 	l.mu.Unlock()
 }
 
+// setSummary updates only the status line, leaving the current weights in place
+// (used when a scan fails so the previous learning isn't discarded).
+func (l *LearnControl) setSummary(summary string) {
+	l.mu.Lock()
+	l.summary = summary
+	l.mu.Unlock()
+}
+
 func (l *LearnControl) weightsSnapshot() []int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -83,10 +92,43 @@ func (l *LearnControl) Summary() string {
 	return l.summary
 }
 
+// Learn-mode weighting. The goal is to *tilt* decoy selection toward the
+// observed vendor mix without collapsing the crowd onto whatever happens to be
+// loudest nearby — a cluster of identical decoys is more conspicuous than a
+// diverse one. So every vendor keeps a solid floor (learnBaseWeight) and each
+// observed vendor earns a dampened, capped boost (learnBoost).
+const (
+	// learnBaseWeight is the floor weight every vendor keeps, so the decoy crowd
+	// stays diverse even when only one vendor is observed nearby.
+	learnBaseWeight = 2
+	// learnMaxBoost caps how much any single observed vendor can be favored. With
+	// the base above and a 26-vendor table this bounds any one vendor to ~17% of
+	// decoys even if it is the only thing seen — a lopsided RF environment (e.g.
+	// only Samsung nearby) can't collapse the crowd into one telltale vendor.
+	learnMaxBoost = 8
+)
+
+// learnBoost maps an observed advertisement count to a bounded weight bonus.
+// It is sqrt-dampened so a single fast-beaconing device (many adverts/sec)
+// doesn't outweigh several steadier ones, and hard-capped at learnMaxBoost.
+func learnBoost(obs int) int {
+	if obs <= 0 {
+		return 0
+	}
+	b := int(math.Round(2 * math.Sqrt(float64(obs))))
+	if b > learnMaxBoost {
+		b = learnMaxBoost
+	}
+	if b < 1 {
+		b = 1
+	}
+	return b
+}
+
 // learnWeights builds decoy weights (parallel to decoy.Vendors) from observed
-// advertisements: a baseline of 1 per vendor plus the observed count for its
-// company ID, so vendors actually present dominate while all stay possible.
-// Returns a short summary of the top in-table vendors observed.
+// advertisements: a floor per vendor plus a dampened, capped boost for the
+// company IDs actually seen nearby, so present vendors are favored while the
+// crowd stays diverse. Returns a short summary of the top in-table vendors.
 func learnWeights(reports []hci.AdvReport) ([]int, string) {
 	obs := map[uint16]int{}
 	for _, r := range reports {
@@ -97,7 +139,7 @@ func learnWeights(reports []hci.AdvReport) ([]int, string) {
 	weights := make([]int, len(decoy.Vendors))
 	inTable := map[uint16]bool{}
 	for i, v := range decoy.Vendors {
-		weights[i] = 1 + obs[v.CompanyID]
+		weights[i] = learnBaseWeight + learnBoost(obs[v.CompanyID])
 		inTable[v.CompanyID] = true
 	}
 
@@ -120,9 +162,20 @@ func learnWeights(reports []hci.AdvReport) ([]int, string) {
 		}
 		parts = append(parts, fmt.Sprintf("%s %d", decoy.CompanyLabel(v.id), v.n))
 	}
-	summary := "no matching vendors nearby"
-	if len(parts) > 0 {
+
+	// Distinguish "scan saw manufacturer adverts but none we can impersonate"
+	// (e.g. an all-Apple room) from "scan saw nothing" — otherwise a working
+	// scan in an Apple-heavy environment looks like a failure.
+	totalMfg := 0
+	for _, n := range obs {
+		totalMfg += n
+	}
+	summary := "no manufacturer adverts seen"
+	switch {
+	case len(parts) > 0:
 		summary = strings.Join(parts, " · ")
+	case totalMfg > 0:
+		summary = fmt.Sprintf("%d adverts, none impersonable — crowd stays diverse", totalMfg)
 	}
 	return weights, summary
 }
