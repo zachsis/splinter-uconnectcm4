@@ -45,25 +45,35 @@ rather than the ESP32-C5's genuinely-concurrent advertising instances. The
 observable "crowd" a scanner sees is equivalent; it's produced by rapid rotation
 instead of hardware concurrency.
 
-## Build & deploy
+## Build & install
 
-hohd is pure Go (no cgo) and cross-compiles to a static binary. Build on your
-Mac/PC and copy the binary to the uConsole — nothing to install on the device.
-
-```bash
-make build-uconsole                 # -> dist/hohd-arm64 (static aarch64)
-make deploy                         # scp the binary to the device
-#   UCONSOLE_HOST=eris@192.168.68.61 make deploy   # override target host
-```
-
-Then run it ad-hoc on the device (it needs root for the Bluetooth adapter):
+hohd is pure Go (no cgo). The simplest path is to **clone and build on the device
+that will run it** — the uConsole, or any Linux host with a BlueZ HCI adapter and
+**Go ≥ 1.24** (`apt install golang`):
 
 ```bash
-sudo ~/hohd-arm64 --dashboard       # or any of the flags below
+git clone https://github.com/zachsis/helmofhades && cd helmofhades
+make                 # native build -> dist/hohd
+sudo make install    # -> /usr/local/bin/hohd
+sudo hohd --dashboard
 ```
 
-(An on-device build via `apt install golang` also works — the module pins `go
-1.24` — but cross-compiling is simpler and needs no toolchain on the uConsole.)
+hohd needs `CAP_NET_RAW` + `CAP_NET_ADMIN`, so run it with `sudo`. To run it
+**without** sudo, grant the caps once with `sudo make setcap` (needs the `setcap`
+tool — `sudo apt install libcap2-bin` on Debian/the uConsole — then just
+`hohd --dashboard`). `make uninstall` removes it; `PREFIX=$HOME/.local make install`
+installs under your home dir with no sudo.
+
+<details><summary>Cross-compile from another machine (optional)</summary>
+
+To build off-device and copy the binary over instead:
+
+```bash
+make build-cross                          # -> dist/hohd-arm64 (static aarch64)
+UCONSOLE_HOST=user@device make deploy     # scp it to the device (GOARCH=... to override arch)
+sudo ~/hohd-arm64 --dashboard             # run ad-hoc on the device
+```
+</details>
 
 ## Run
 
