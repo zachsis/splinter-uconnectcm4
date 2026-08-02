@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// IsTerminal always reports false off Linux (splinterd only runs on Linux; this
+// IsTerminal always reports false off Linux (hohd only runs on Linux; this
 // keeps the tree building and the pure renderer testable on the dev Mac).
 func IsTerminal(fd uintptr) bool { return false }
 

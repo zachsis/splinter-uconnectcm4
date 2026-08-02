@@ -1,5 +1,5 @@
 // Package dashboard renders a live, in-place-refreshing terminal view of
-// splinterd's decoy activity (mtr-style). The Model is a thread-safe stats sink
+// hohd's decoy activity (mtr-style). The Model is a thread-safe stats sink
 // that satisfies engine.Reporter; the renderer and the terminal driver read
 // immutable Snapshots so the hot path never blocks on I/O.
 package dashboard
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+	"github.com/zachsis/helmofhades/internal/verify"
 )
 
 // FocusTarget selects which table the scroll keys act on.

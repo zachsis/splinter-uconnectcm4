@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/decoy"
 )
 
 func TestAppleControlCycle(t *testing.T) {

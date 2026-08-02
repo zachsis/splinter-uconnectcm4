@@ -1,4 +1,4 @@
-# splinter-uconnectcm4 (`splinterd`)
+# helmofhades (`hohd`)
 
 A BLE privacy / anti-tracking **decoy** for Linux — a native Go port of the
 concept from [JakeSwiz/splinter](https://github.com/JakeSwiz/splinter) (an ESP32
@@ -7,7 +7,7 @@ radio. No extra hardware required.
 
 ## What it does
 
-`splinterd` continuously fabricates a churning crowd of plausible-but-fake
+`hohd` continuously fabricates a churning crowd of plausible-but-fake
 Bluetooth LE devices. In a space you control, a tracking or scanning system then
 sees lots of ordinary-looking traffic, so your real device(s) don't stand out.
 
@@ -39,30 +39,27 @@ Linux with a BlueZ-managed HCI controller. Validated on the ClockworkPi uConsole
 (CM4, Cypress **CYW43455**, Bluetooth 5.0, BlueZ 5.82).
 
 **Capability caveat:** the CYW43455 does **not** support LE Extended Advertising
-(its LE feature bitmap has bit 12 clear). splinterd therefore reproduces the
-splinter firmware's *classic* behavior — **one legacy advertiser rotated fast** —
+(its LE feature bitmap has bit 12 clear). hohd therefore reproduces the
+original firmware's *classic* behavior — **one legacy advertiser rotated fast** —
 rather than the ESP32-C5's genuinely-concurrent advertising instances. The
 observable "crowd" a scanner sees is equivalent; it's produced by rapid rotation
 instead of hardware concurrency.
 
 ## Build & deploy
 
-splinterd is pure Go (no cgo) and cross-compiles to a static binary. The normal
-path is to **build on your Mac/PC and copy the binary to the uConsole** — nothing
-to install on the device.
+hohd is pure Go (no cgo) and cross-compiles to a static binary. Build on your
+Mac/PC and copy the binary to the uConsole — nothing to install on the device.
 
 ```bash
-make build-uconsole                 # -> dist/splinterd-arm64 (static aarch64)
-make install-uconsole               # scp binary + unit + installer to the device
-#   UCONSOLE_HOST=eris@192.168.68.60 make install-uconsole   # override target host
+make build-uconsole                 # -> dist/hohd-arm64 (static aarch64)
+make deploy                         # scp the binary to the device
+#   UCONSOLE_HOST=eris@192.168.68.61 make deploy   # override target host
 ```
 
-Then, on the device:
+Then run it ad-hoc on the device (it needs root for the Bluetooth adapter):
 
 ```bash
-sudo sh install.sh splinterd-arm64          # creates the 'splinter' user, installs the unit
-sudo systemctl enable --now splinterd
-journalctl -u splinterd -f
+sudo ~/hohd-arm64 --dashboard       # or any of the flags below
 ```
 
 (An on-device build via `apt install golang` also works — the module pins `go
@@ -71,7 +68,7 @@ journalctl -u splinterd -f
 ## Run
 
 ```bash
-splinterd [flags]
+hohd [flags]
 ```
 
 | Flag | Default | Meaning |
@@ -86,7 +83,7 @@ splinterd [flags]
 | `--benchmark` | false | bounded self-calibration: probe intervals, print recommended settings, then exit |
 | `--duration` | 10s | `--benchmark` run time |
 | `--hci` | 0 | HCI device index to drive (`hciX`) |
-| `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or under systemd) |
+| `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or non-interactive) |
 | `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `ocean` / `synthwave` / `gruvbox` / `dracula` / `mono` (honors `NO_COLOR`) |
 | `--learn-window` | 15s | learn-mode passive scan window (dashboard `l` key) |
 | `--apple-mode` | naive | Apple decoy mode: `off` / `naive` / `nearform` (dashboard `a` cycles live) |
@@ -94,12 +91,12 @@ splinterd [flags]
 | `--trackers` | false | emit service-data trackers Tile + Fast Pair (dashboard `s` toggles live) |
 | `--tracker-share` | 20 | % of decoys that are service-data trackers when `--trackers` is on |
 | `--debug` | false | write a debug log of engine activity to a file (dashboard `D` toggles live) |
-| `--log-file` | | debug log path (default: a timestamped `splinterd-<ts>.log` in the current dir) |
+| `--log-file` | | debug log path (default: a timestamped `hohd-<ts>.log` in the current dir) |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
-It needs `CAP_NET_RAW` + `CAP_NET_ADMIN` (the systemd unit grants both to an
-unprivileged `splinter` user; running by hand needs `sudo` or `setcap`). Once
+It needs `CAP_NET_RAW` + `CAP_NET_ADMIN` — run it with `sudo` (or grant the caps
+with `setcap`). Once
 running it logs `rate: devices_per_sec=N` every second.
 
 ### Getting a crowd a scanner actually sees
@@ -107,7 +104,7 @@ running it logs `rate: devices_per_sec=N` every second.
 A decoy is only observable if its identity stays on-air long enough to transmit at
 least one advertising packet — i.e. the **dwell (`--rotate-ms`) must be ≥ the
 advertising interval (`--adv-ms`)**. Rotating faster than you advertise (the old
-"flood") maxes out HCI commands but broadcasts almost nothing; splinterd warns if
+"flood") maxes out HCI commands but broadcasts almost nothing; hohd warns if
 you configure `--rotate-ms < --adv-ms`.
 
 The easy path is **`--dense`**, which probes the controller for ~10 s to find the
@@ -115,15 +112,15 @@ fastest advertising interval it actually sustains, then runs at the
 visibility-optimal `rotate-ms = --adverts-per-id × adv-ms`:
 
 ```bash
-sudo splinterd --dense              # calm default
-sudo splinterd --dense --aggressive # push to the lowest interval the radio allows
-splinterd --benchmark               # just probe + print the recommended flags, don't run
+sudo hohd --dense              # calm default
+sudo hohd --dense --aggressive # push to the lowest interval the radio allows
+hohd --benchmark               # just probe + print the recommended flags, don't run
 ```
 
 Add **`--dashboard`** to any run mode for a live, in-place-refreshing terminal view
 (counters, rate/fails sparklines, the current fake identity, and a vendor-crowd
 histogram) instead of scrolling log lines — think `mtr`. It needs an interactive
-terminal; when stdout isn't a TTY (piped, or under systemd) it automatically falls
+terminal; when stdout isn't a TTY (piped or non-interactive) it automatically falls
 back to line logging.
 
 The dashboard shows a **multi-row rate graph**, a compact fails sparkline, the
@@ -157,7 +154,7 @@ scanner that buckets by company ID. `naive` (default) emits Apple's `0x004C`
 company ID — enough to defeat company-ID bucketing; `nearform` emits a
 well-formed Continuity **Nearby Info** beacon, indistinguishable from a real
 iPhone to a format-aware fingerprinter; `off` disables it. The `a` hotkey cycles
-off → naive → nearby-info. splinterd **never** emits Apple Find My (`0x12`)
+off → naive → nearby-info. hohd **never** emits Apple Find My (`0x12`)
 frames — those would trigger "unknown tracker near you" anti-stalking alerts on
 bystanders.
 
@@ -171,13 +168,13 @@ pair" sheet — or any notification — on a bystander's phone.
 On the uConsole's **CYW43455**, non-connectable advertising is floored at **100 ms**
 (the legacy `ADV_NONCONN_IND` minimum — the chip rejects lower), so `--dense`
 calibrates to `adv-ms=100, rotate-ms=200` (~5 visible decoys/sec). Confirm the crowd
-with a BLE scanner (nRF Connect) or `splinter-verify` on a second device.
+with a BLE scanner (nRF Connect) or `hoh-verify` on a second device.
 
 ## Bluetooth coexistence
 
-While running, splinterd takes **exclusive** control of the adapter — normal
+While running, hohd takes **exclusive** control of the adapter — normal
 Bluetooth (audio, etc.) is unavailable for the session. It hands the controller
-back to `bluetoothd` cleanly on exit (SIGINT/SIGTERM or `systemctl stop`). If
+back to `bluetoothd` cleanly on exit (SIGINT/SIGTERM). If
 Bluetooth ever misbehaves after an unclean exit, recover with:
 
 ```bash
@@ -186,7 +183,7 @@ sudo systemctl restart bluetooth
 
 ## Verifying parity
 
-The `splinter-verify` tool scans from a **second** BLE device and reports the
+The `hoh-verify` tool scans from a **second** BLE device and reports the
 decoy crowd (distinct MACs/sec, vendor-ID spread) and asserts the guardrails
 (no Apple/Microsoft/Fast-Pair payloads, all non-connectable). See
 [`docs/verify.md`](docs/verify.md).

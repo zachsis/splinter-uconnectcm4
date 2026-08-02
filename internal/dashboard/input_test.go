@@ -3,7 +3,7 @@ package dashboard
 import (
 	"testing"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+	"github.com/zachsis/helmofhades/internal/verify"
 )
 
 // fake controllers for input dispatch tests.

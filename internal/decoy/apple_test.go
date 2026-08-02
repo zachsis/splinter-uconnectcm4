@@ -4,7 +4,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
+	"github.com/zachsis/helmofhades/internal/config"
 )
 
 // mfgBody walks an AD payload and returns the manufacturer-specific data body

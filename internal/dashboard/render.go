@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
-	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+	"github.com/zachsis/helmofhades/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/verify"
 )
 
 var blocks = []rune("▁▂▃▄▅▆▇█")
@@ -269,7 +269,7 @@ func TableRows(height int) int {
 func renderHelp(s Snapshot, width, height int) string {
 	t := s.Theme
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n\n", paint(t.Header, "splinterd dashboard — help"))
+	fmt.Fprintf(&b, "%s\n\n", paint(t.Header, "hohd dashboard — help"))
 	keys := [][2]string{
 		{"+ / -", "raise / lower the live rotation rate (dwell)"},
 		{"t", "cycle color theme"},
@@ -314,7 +314,7 @@ func RenderFrame(s Snapshot, width, height int) string {
 
 	t := s.Theme
 	var b strings.Builder
-	header := fmt.Sprintf("splinterd — %s · adv %dms · dwell %dms", s.Mode, s.AdvMs, s.RotateMs)
+	header := fmt.Sprintf("hohd — %s · adv %dms · dwell %dms", s.Mode, s.AdvMs, s.RotateMs)
 	if s.AppleMode != "" && s.AppleMode != "off" {
 		header += " · apple " + s.AppleMode
 	}

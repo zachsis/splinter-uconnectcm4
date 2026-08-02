@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
-	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
-	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+	"github.com/zachsis/helmofhades/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/hci"
+	"github.com/zachsis/helmofhades/internal/verify"
 )
 
 // Scanner performs a passive LE scan for the given window. *hci.Conn satisfies it.

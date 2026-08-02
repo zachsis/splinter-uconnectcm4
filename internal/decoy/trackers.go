@@ -2,7 +2,7 @@ package decoy
 
 import "math/rand/v2"
 
-// Service UUIDs for the item trackers splinterd can impersonate. These devices
+// Service UUIDs for the item trackers hohd can impersonate. These devices
 // advertise via Service Data (0x16) / Service UUID (0x03) rather than
 // manufacturer-specific data, so a passive collector buckets them by UUID.
 const (

@@ -3,7 +3,7 @@ package engine
 import (
 	"sync/atomic"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/decoy"
 )
 
 // AppleControl holds the live-adjustable Apple-decoy mode. The dashboard 'a'

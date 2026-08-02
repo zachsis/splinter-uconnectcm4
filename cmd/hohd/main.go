@@ -1,5 +1,5 @@
-// Command splinterd is a BLE privacy / anti-tracking decoy for Linux — a native
-// port of the splinter ESP32 firmware concept, targeting the ClockworkPi
+// Command hohd is a BLE privacy / anti-tracking decoy for Linux — a native
+// port of an ESP32 BLE-decoy firmware concept, targeting the ClockworkPi
 // uConsole (CM4). It fabricates a churning crowd of plausible, non-connectable
 // fake BLE devices so real devices don't stand out to a scanner in a space you
 // control.
@@ -18,38 +18,38 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
-	"github.com/zachsis/splinter-uconnectcm4/internal/dashboard"
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
-	"github.com/zachsis/splinter-uconnectcm4/internal/engine"
-	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
-	"github.com/zachsis/splinter-uconnectcm4/internal/tune"
+	"github.com/zachsis/helmofhades/internal/config"
+	"github.com/zachsis/helmofhades/internal/dashboard"
+	"github.com/zachsis/helmofhades/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/engine"
+	"github.com/zachsis/helmofhades/internal/hci"
+	"github.com/zachsis/helmofhades/internal/tune"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
 var version = "dev"
 
 func main() {
-	cfg, err := config.Parse("splinterd", os.Args[1:], os.Stderr)
+	cfg, err := config.Parse("hohd", os.Args[1:], os.Stderr)
 	switch {
 	case errors.Is(err, config.ErrVersion):
-		fmt.Println("splinterd", version)
+		fmt.Println("hohd", version)
 		return
 	case errors.Is(err, flag.ErrHelp):
 		return // usage already printed by the flag package
 	case err != nil:
-		fmt.Fprintln(os.Stderr, "splinterd:", err)
+		fmt.Fprintln(os.Stderr, "hohd:", err)
 		os.Exit(2)
 	}
 
 	if !dashboard.ValidTheme(cfg.Theme) {
-		fmt.Fprintf(os.Stderr, "splinterd: unknown --theme %q (valid: %s)\n",
+		fmt.Fprintf(os.Stderr, "hohd: unknown --theme %q (valid: %s)\n",
 			cfg.Theme, strings.Join(dashboard.ThemeNames(), ", "))
 		os.Exit(2)
 	}
 
 	if err := run(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "splinterd:", err)
+		fmt.Fprintln(os.Stderr, "hohd:", err)
 		os.Exit(1)
 	}
 }
@@ -78,7 +78,7 @@ func run(cfg config.Config) error {
 	defer stop()
 
 	if cfg.Benchmark {
-		log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex)
+		log.Info("hohd starting", "version", version, "hci", cfg.HCIIndex)
 		return runBenchmark(ctx, conn, cfg, log)
 	}
 
@@ -182,7 +182,7 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 			log.Warn("could not open debug log", "err", err)
 		}
 	}
-	logger.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
+	logger.Info("hohd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
 	apple := engine.NewAppleControl(appleKind(cfg))
 	trackers := engine.NewTrackerControl(cfg.Trackers)
 	return engine.Run(ctx, conn, cfg, logger, engine.LogReporter{Log: logger}, nil, nil, nil, apple, trackers, nil)
@@ -215,7 +215,7 @@ func runBenchmark(ctx context.Context, conn engine.Controller, cfg config.Config
 		return nil
 	}
 	log.Info("recommended settings", "flags", rec.String(),
-		"note", "estimate is model-based (TX-side); confirm real capture with splinter-verify on a 2nd device")
+		"note", "estimate is model-based (TX-side); confirm real capture with hoh-verify on a 2nd device")
 	return nil
 }
 

@@ -1,6 +1,6 @@
 // Package decoy builds fake BLE identities: a random-static MAC and a spec-valid,
 // non-connectable advertising payload attributing the device to a plausible
-// vendor. It reproduces the behavior of the splinter firmware's decoy generation
+// vendor. It reproduces the behavior of the original firmware's decoy generation
 // with no HCI/socket dependencies, so it is deterministically testable.
 package decoy
 
@@ -8,7 +8,7 @@ import (
 	"math/bits"
 	"math/rand/v2"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
+	"github.com/zachsis/helmofhades/internal/config"
 )
 
 // Advertising Data (AD) types, from the Bluetooth assigned-numbers registry.

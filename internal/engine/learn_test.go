@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
-	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
+	"github.com/zachsis/helmofhades/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/hci"
 )
 
 func advWithCompany(id uint16) hci.AdvReport {

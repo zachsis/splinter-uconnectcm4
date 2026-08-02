@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+- **Renamed the project to Helm of Hades** (#30): the daemon `splinterd` → `hohd`,
+  the parity tool `splinter-verify` → `hoh-verify`, the Go module → `github.com/
+  zachsis/helmofhades`, and the repo → `helmofhades`. The upstream credit to
+  [JakeSwiz/splinter](https://github.com/JakeSwiz/splinter) is retained. Removed
+  the unused systemd unit + installer (ad-hoc `sudo ./hohd-arm64` only).
+
 ### Added
 - **Dashboard v3** (#27): a `?` help overlay listing every hotkey; `Space` to
   stop/start broadcasting (keeps the adapter); a **learned-devices** table
@@ -80,7 +87,7 @@ BLE-decoy concept, targeting the ClockworkPi uConsole (CM4).
   benchmark modes.
 - `systemd` unit running unprivileged via ambient `CAP_NET_RAW`/`CAP_NET_ADMIN`,
   plus an installer.
-- `splinter-verify` parity harness (scan-side crowd + guardrail assertions).
+- `hoh-verify` parity harness (scan-side crowd + guardrail assertions).
 - Cross-compiles to a static aarch64 binary. Validated on the uConsole
   (Cypress CYW43455): ~10 decoys/sec, zero cycle failures.
 

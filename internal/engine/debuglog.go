@@ -12,7 +12,7 @@ import (
 // DefaultLogPath returns a timestamped log filename in the current directory,
 // used when no explicit --log-file is given.
 func DefaultLogPath() string {
-	return fmt.Sprintf("splinterd-%s.log", time.Now().Format("20060102-150405"))
+	return fmt.Sprintf("hohd-%s.log", time.Now().Format("20060102-150405"))
 }
 
 // OpenDebugFile opens (create/append) the debug log at path, or a timestamped

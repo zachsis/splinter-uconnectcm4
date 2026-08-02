@@ -1,4 +1,4 @@
-// Package config holds splinterd's runtime tunables. The struct is the single
+// Package config holds hohd's runtime tunables. The struct is the single
 // source of truth consumed by the decoy builder, the rotation engine, and the
 // CLI, and its defaults mirror the ESP32 firmware's compile-time macros.
 package config
@@ -7,10 +7,10 @@ import "time"
 
 // Config holds all runtime tunables.
 type Config struct {
-	RotateMs     int           // paced-mode delay between decoys, ms (firmware SPLINTER_ROTATE_MS)
-	NameProb     int           // % chance a decoy advertises a name (firmware SPLINTER_NAME_PROB)
-	MfgProb      int           // % chance a decoy carries vendor mfg data (firmware SPLINTER_MFG_PROB)
-	AdvMs        int           // on-air advertising interval MIN, ms; max = AdvMs+30 (firmware SPLINTER_ADV_MS)
+	RotateMs     int           // paced-mode delay between decoys, ms (original firmware default)
+	NameProb     int           // % chance a decoy advertises a name (original firmware default)
+	MfgProb      int           // % chance a decoy carries vendor mfg data (original firmware default)
+	AdvMs        int           // on-air advertising interval MIN, ms; max = AdvMs+30 (original firmware default)
 	Benchmark    bool          // bounded self-calibrating benchmark (was: max-rate flood)
 	Duration     time.Duration // benchmark run time; 0 = mode default (10s)
 	Dense        bool          // self-calibrating maximum-visibility mode
@@ -24,7 +24,7 @@ type Config struct {
 	Trackers     bool          // emit service-data trackers (Tile/Fast Pair); dashboard 's' toggles live
 	TrackerShare int           // % of decoys that are service-data trackers when Trackers is on
 	Debug        bool          // write a debug log file of engine activity (dashboard 'D' toggles live)
-	LogFile      string        // explicit debug log path; empty => timestamped splinterd-<ts>.log in cwd
+	LogFile      string        // explicit debug log path; empty => timestamped hohd-<ts>.log in cwd
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseDefaults(t *testing.T) {
-	cfg, err := Parse("splinterd", nil, io.Discard)
+	cfg, err := Parse("hohd", nil, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +18,7 @@ func TestParseDefaults(t *testing.T) {
 }
 
 func TestParseOverrides(t *testing.T) {
-	cfg, err := Parse("splinterd", []string{"--rotate-ms", "500", "--benchmark", "--hci", "1"}, io.Discard)
+	cfg, err := Parse("hohd", []string{"--rotate-ms", "500", "--benchmark", "--hci", "1"}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,13 +28,13 @@ func TestParseOverrides(t *testing.T) {
 }
 
 func TestParseVersion(t *testing.T) {
-	if _, err := Parse("splinterd", []string{"--version"}, io.Discard); !errors.Is(err, ErrVersion) {
+	if _, err := Parse("hohd", []string{"--version"}, io.Discard); !errors.Is(err, ErrVersion) {
 		t.Fatalf("expected ErrVersion, got %v", err)
 	}
 }
 
 func TestParseHelp(t *testing.T) {
-	if _, err := Parse("splinterd", []string{"-h"}, io.Discard); !errors.Is(err, flag.ErrHelp) {
+	if _, err := Parse("hohd", []string{"-h"}, io.Discard); !errors.Is(err, flag.ErrHelp) {
 		t.Fatalf("expected flag.ErrHelp, got %v", err)
 	}
 }
@@ -51,7 +51,7 @@ func TestParseInvalid(t *testing.T) {
 		{"--dashboard", "--benchmark"}, // dashboard unsupported with benchmark
 	}
 	for _, args := range cases {
-		if _, err := Parse("splinterd", args, io.Discard); err == nil {
+		if _, err := Parse("hohd", args, io.Discard); err == nil {
 			t.Fatalf("expected validation error for %v", args)
 		}
 	}
