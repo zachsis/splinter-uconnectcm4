@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
 )
 
 var blocks = []rune("▁▂▃▄▅▆▇█")
@@ -115,30 +116,19 @@ func macStr(a [6]byte) string {
 	return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[0], a[1], a[2], a[3], a[4], a[5])
 }
 
-// crowdTable renders the vendor histogram as an htop-style table (sorted desc):
-// aligned name column, a proportional bar, and the numeric count. It returns at
-// most maxRows vendor lines plus a "… +N more" line when truncated. vendors must
-// already be sorted by count descending.
-func crowdTable(vendors []VendorCount, width, maxRows int) []string {
-	if maxRows < 1 {
-		maxRows = 1
-	}
+// crowdRows renders the vendor histogram as htop-style rows (name · bar · count),
+// one per vendor with no truncation (the caller scrolls). vendors must be sorted
+// by count descending.
+func crowdRows(vendors []VendorCount, width int) []string {
 	if len(vendors) == 0 {
-		return []string{"(warming up…)"}
+		return nil
 	}
-	shown := vendors
-	truncated := 0
-	if len(shown) > maxRows {
-		truncated = len(shown) - maxRows
-		shown = shown[:maxRows]
-	}
-
-	top := shown[0].Count
+	top := vendors[0].Count
 	if top < 1 {
 		top = 1
 	}
 	nameW := 0
-	for _, v := range shown {
+	for _, v := range vendors {
 		if n := len(companyLabel(v.ID)); n > nameW {
 			nameW = n
 		}
@@ -150,19 +140,154 @@ func crowdTable(vendors []VendorCount, width, maxRows int) []string {
 	if barMax > 24 {
 		barMax = 24
 	}
-
-	lines := make([]string, 0, len(shown)+1)
-	for _, v := range shown {
+	lines := make([]string, 0, len(vendors))
+	for _, v := range vendors {
 		bars := v.Count * barMax / top
 		if bars < 1 {
 			bars = 1
 		}
 		lines = append(lines, fmt.Sprintf("%-*s %-*s %d", nameW, companyLabel(v.ID), barMax, strings.Repeat("█", bars), v.Count))
 	}
-	if truncated > 0 {
-		lines = append(lines, fmt.Sprintf("… +%d more", truncated))
-	}
 	return lines
+}
+
+// deviceID returns the display ID and friendly label for an observed device.
+func deviceID(o verify.Observation) (id, label string) {
+	switch {
+	case o.Tile:
+		return "svc FEED", "Tile"
+	case o.FastPair:
+		return "svc FE2C", "Fast Pair"
+	case o.HasMfg:
+		return fmt.Sprintf("%#04x", o.CompanyID), companyLabel(o.CompanyID)
+	default:
+		return "—", "—"
+	}
+}
+
+// learnedRows formats observed devices as rows: MAC · RSSI · ID · label · name.
+// Columns are fixed-width, so unlike crowdRows this doesn't need the terminal
+// width.
+func learnedRows(devices []verify.Observation) []string {
+	rows := make([]string, 0, len(devices))
+	for _, o := range devices {
+		id, label := deviceID(o)
+		name := o.Name
+		if name == "" {
+			name = "—"
+		}
+		rssi := "   ?"
+		if o.RSSI != 0 {
+			rssi = fmt.Sprintf("%4d", o.RSSI)
+		}
+		rows = append(rows, fmt.Sprintf("%s %sdBm  %-8s %-10s %s", macStr(o.MAC), rssi, id, label, truncate(name, 14)))
+	}
+	return rows
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	if n <= 1 {
+		return s[:n]
+	}
+	return s[:n-1] + "…"
+}
+
+// scrollView returns the display lines for one scrollable table: a title line
+// (with a position indicator + ▲/▼ when scrollable) and the visible slice of
+// rows starting at offset. focused marks the active table with a ▶ marker.
+func scrollView(title string, rows []string, offset, budget int, focused bool, t Theme) []string {
+	if budget < 1 {
+		budget = 1
+	}
+	total := len(rows)
+	if offset > total-budget {
+		offset = total - budget
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + budget
+	if end > total {
+		end = total
+	}
+	marker := "  "
+	if focused {
+		marker = paint(t.Value, "▶ ")
+	}
+	head := marker + paint(t.Label, title)
+	if total > budget {
+		head += paint(t.Dim, fmt.Sprintf("  [%d–%d/%d]", offset+1, end, total))
+		if offset > 0 {
+			head += paint(t.Dim, " ▲")
+		}
+		if end < total {
+			head += paint(t.Dim, " ▼")
+		}
+	}
+	out := []string{head}
+	if total == 0 {
+		return append(out, "    "+paint(t.Dim, "(none yet)"))
+	}
+	for _, r := range rows[offset:end] {
+		out = append(out, "    "+paint(t.Value, r))
+	}
+	return out
+}
+
+func graphRowsFor(height int) int {
+	if height > 0 && height < 18 {
+		return 2
+	}
+	return 4
+}
+
+// TableRows is how many data rows EACH of the crowd/learned tables shows for the
+// given terminal height. The render loop and the model's scroll clamping both
+// use it so scrolling matches what's drawn.
+func TableRows(height int) int {
+	if height <= 0 {
+		return 6
+	}
+	rem := height - (16 + graphRowsFor(height)) // fixed header/graph/status/footer lines
+	if rem < 4 {
+		rem = 4
+	}
+	r := rem / 2
+	if r < 2 {
+		r = 2
+	}
+	if r > 15 {
+		r = 15
+	}
+	return r
+}
+
+// renderHelp draws the full-screen help overlay (the `?` key).
+func renderHelp(s Snapshot, width, height int) string {
+	t := s.Theme
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n\n", paint(t.Header, "splinterd dashboard — help"))
+	keys := [][2]string{
+		{"+ / -", "raise / lower the live rotation rate (dwell)"},
+		{"t", "cycle color theme"},
+		{"l", "learn: scan nearby BLE, bias decoys to the local mix"},
+		{"a", "cycle Apple decoy mode (off → naive → nearby-info)"},
+		{"s", "toggle service-data trackers (Tile / Fast Pair)"},
+		{"Space", "stop / start broadcasting (keeps the adapter)"},
+		{"Tab", "switch scroll focus: crowd ↔ learned tables"},
+		{"↑ ↓ · PgUp PgDn · Home End", "scroll the focused table"},
+		{"D", "toggle a debug log file in the current directory"},
+		{"?", "show / hide this help"},
+		{"q / Ctrl-C", "quit and restore the adapter to bluetoothd"},
+	}
+	for _, kv := range keys {
+		fmt.Fprintf(&b, "  %s  %s\n", paint(t.Value, fmt.Sprintf("%-27s", kv[0])), paint(t.Label, kv[1]))
+	}
+	b.WriteString("\n  " + paint(t.Dim, "press ? or q to return") + "\n")
+	return b.String()
 }
 
 // RenderFrame builds the dashboard frame text for a snapshot and terminal size.
@@ -170,6 +295,9 @@ func crowdTable(vendors []VendorCount, width, maxRows int) []string {
 func RenderFrame(s Snapshot, width, height int) string {
 	if width < 40 {
 		width = 40
+	}
+	if s.HelpOpen {
+		return renderHelp(s, width, height)
 	}
 	cur, peak, avg := rateStats(s.RateHist)
 	failPct := 0.0
@@ -193,16 +321,19 @@ func RenderFrame(s Snapshot, width, height int) string {
 	if s.TrackersOn {
 		header += " · trackers on"
 	}
-	fmt.Fprintf(&b, "%s\n\n", paint(t.Header, header))
+	head := paint(t.Header, header)
+	if s.Paused {
+		head += " " + paint(t.Warn, "⏸ PAUSED")
+	}
+	if s.DebugOn {
+		head += " " + paint(t.Warn, "⏺ REC")
+	}
+	fmt.Fprintf(&b, "%s\n\n", head)
 	fmt.Fprintf(&b, "  %s %s     %s %d     Bluetooth hci0 (exclusive)\n\n",
 		paint(t.Label, "uptime"), fmtDur(s.Uptime), paint(t.Label, "total"), s.Total)
 	fmt.Fprintf(&b, "  %s   %s   peak %d  avg %.1f\n",
 		paint(t.Label, "rate"), paint(t.Value, fmt.Sprintf("%d/s", cur)), peak, avg)
-	graphRows := 4
-	if height > 0 && height < 18 {
-		graphRows = 2 // short screen: keep it compact
-	}
-	for _, line := range blockGraph(s.RateHist, sparkW, graphRows) {
+	for _, line := range blockGraph(s.RateHist, sparkW, graphRowsFor(height)) {
 		fmt.Fprintf(&b, "  %s\n", paint(t.Spark, line))
 	}
 	fmt.Fprintf(&b, "  %s  %s  %s\n\n",
@@ -213,28 +344,24 @@ func RenderFrame(s Snapshot, width, height int) string {
 		if name == "" {
 			name = "(nameless)"
 		}
-		fmt.Fprintf(&b, "  %s    %s  %s  %s\n\n", paint(t.Label, "now"),
+		fmt.Fprintf(&b, "  %s    %s  %s  %s\n", paint(t.Label, "now"),
 			macStr(s.LastAddr), paint(t.Value, fmt.Sprintf("%q", name)), paint(t.Label, companyLabel(s.LastID)))
 	}
 	if s.LearnActive {
-		fmt.Fprintf(&b, "  %s  %s\n\n", paint(t.Warn, "learn"), "scanning ambient devices…")
+		fmt.Fprintf(&b, "  %s  %s\n", paint(t.Warn, "learn"), "scanning ambient devices…")
 	} else if s.LearnLine != "" {
-		fmt.Fprintf(&b, "  %s  learned: %s\n\n", paint(t.Label, "learn"), s.LearnLine)
+		fmt.Fprintf(&b, "  %s  %s\n", paint(t.Label, "learn"), s.LearnLine)
 	}
-	fmt.Fprintf(&b, "  %s\n", paint(t.Label, "crowd"))
-	crowdRows := 6
-	if height > 0 {
-		crowdRows = height - graphRows - 13 // leave room for the fixed lines
-		if crowdRows < 2 {
-			crowdRows = 2
-		}
-		if crowdRows > 8 {
-			crowdRows = 8
-		}
+	b.WriteString("\n")
+
+	budget := TableRows(height)
+	for _, line := range scrollView("crowd", crowdRows(s.Vendors, width-6), s.CrowdScroll, budget, s.Focus == FocusCrowd, t) {
+		b.WriteString(line + "\n")
 	}
-	for _, line := range crowdTable(s.Vendors, width-4, crowdRows) {
-		fmt.Fprintf(&b, "    %s\n", paint(t.Value, line))
+	b.WriteString("\n")
+	for _, line := range scrollView("learned devices", learnedRows(s.Learned), s.LearnScroll, budget, s.Focus == FocusLearned, t) {
+		b.WriteString(line + "\n")
 	}
-	b.WriteString("\n  " + paint(t.Dim, "+/- rate  ·  t theme  ·  l learn  ·  a apple  ·  s trackers  ·  q/Ctrl-C quit") + "\n")
+	b.WriteString("\n  " + paint(t.Dim, "? help · space pause · tab/↑↓ scroll · t theme · l learn · q quit") + "\n")
 	return b.String()
 }

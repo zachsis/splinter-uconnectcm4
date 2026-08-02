@@ -26,14 +26,18 @@ func fg256(n int) string { return fmt.Sprintf("\x1b[38;5;%dm", n) }
 var monoTheme = Theme{Name: "mono"}
 
 var themes = map[string]Theme{
-	"matrix": {Name: "matrix", Header: fg256(46), Label: fg256(34), Value: fg256(48), Warn: fg256(196), Spark: fg256(40), Dim: fg256(238)},
-	"amber":  {Name: "amber", Header: fg256(214), Label: fg256(136), Value: fg256(220), Warn: fg256(202), Spark: fg256(214), Dim: fg256(94)},
-	"neon":   {Name: "neon", Header: fg256(51), Label: fg256(45), Value: fg256(201), Warn: fg256(197), Spark: fg256(51), Dim: fg256(240)},
-	"mono":   monoTheme,
+	"matrix":    {Name: "matrix", Header: fg256(46), Label: fg256(34), Value: fg256(48), Warn: fg256(196), Spark: fg256(40), Dim: fg256(238)},
+	"amber":     {Name: "amber", Header: fg256(214), Label: fg256(136), Value: fg256(220), Warn: fg256(202), Spark: fg256(214), Dim: fg256(94)},
+	"neon":      {Name: "neon", Header: fg256(51), Label: fg256(45), Value: fg256(201), Warn: fg256(197), Spark: fg256(51), Dim: fg256(240)},
+	"ocean":     {Name: "ocean", Header: fg256(39), Label: fg256(31), Value: fg256(45), Warn: fg256(203), Spark: fg256(38), Dim: fg256(24)},
+	"synthwave": {Name: "synthwave", Header: fg256(201), Label: fg256(129), Value: fg256(51), Warn: fg256(197), Spark: fg256(165), Dim: fg256(54)},
+	"gruvbox":   {Name: "gruvbox", Header: fg256(214), Label: fg256(106), Value: fg256(223), Warn: fg256(167), Spark: fg256(108), Dim: fg256(240)},
+	"dracula":   {Name: "dracula", Header: fg256(141), Label: fg256(84), Value: fg256(212), Warn: fg256(203), Spark: fg256(117), Dim: fg256(60)},
+	"mono":      monoTheme,
 }
 
 // themeOrder is the cycle order for the `t` hotkey.
-var themeOrder = []string{"matrix", "amber", "neon", "mono"}
+var themeOrder = []string{"matrix", "amber", "neon", "ocean", "synthwave", "gruvbox", "dracula", "mono"}
 
 // ThemeNames returns the valid theme names (for --theme validation/help).
 func ThemeNames() []string { return append([]string(nil), themeOrder...) }

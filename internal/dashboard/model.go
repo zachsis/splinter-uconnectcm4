@@ -8,6 +8,16 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+)
+
+// FocusTarget selects which table the scroll keys act on.
+type FocusTarget int
+
+const (
+	FocusCrowd FocusTarget = iota
+	FocusLearned
 )
 
 // histLen is how many per-second samples the sparklines retain.
@@ -35,6 +45,17 @@ type Model struct {
 	learnLine   string
 	appleMode   string
 	trackersOn  bool
+	paused      bool
+	helpOpen    bool
+	debugOn     bool
+	debugPath   string
+	learned     []verify.Observation
+	focus       FocusTarget
+	crowdScroll int
+	learnScroll int
+	crowdMax    int // max scroll offset for the crowd table (updated each frame)
+	learnMax    int // max scroll offset for the learned table
+	viewport    int // rows shown per table this frame (for page scrolling)
 }
 
 // SetColor enables or disables ANSI color (disabled => mono regardless of theme).
@@ -85,6 +106,7 @@ type LearnController interface {
 	Request()
 	Learning() bool
 	Summary() string
+	Devices() []verify.Observation
 }
 
 // AppleController is the subset of engine.AppleControl the dashboard needs to
@@ -115,6 +137,142 @@ type TrackerController interface {
 func (m *Model) SetTrackers(on bool) {
 	m.mu.Lock()
 	m.trackersOn = on
+	m.mu.Unlock()
+}
+
+// Controls bundles the live controls the terminal driver reads and toggles, so
+// the Run signature doesn't grow unbounded. Any field may be nil.
+type Controls struct {
+	Rate      RateAdjuster
+	Learn     LearnController
+	Apple     AppleController
+	Trackers  TrackerController
+	Broadcast BroadcastController
+	Debug     DebugController
+	OnQuit    func()
+}
+
+// BroadcastController is the subset of engine.BroadcastControl the dashboard
+// needs to show and toggle the pause state. *engine.BroadcastControl satisfies it.
+type BroadcastController interface {
+	Paused() bool
+	Toggle() bool
+}
+
+// DebugController is the subset of engine.DebugControl the dashboard needs to
+// show and toggle debug file logging. *engine.DebugControl satisfies it.
+type DebugController interface {
+	Enabled() bool
+	Toggle() bool
+	Path() string
+}
+
+// SetPaused mirrors the broadcast pause state.
+func (m *Model) SetPaused(p bool) { m.mu.Lock(); m.paused = p; m.mu.Unlock() }
+
+// SetDebug mirrors the debug-logging state and current file path.
+func (m *Model) SetDebug(on bool, path string) {
+	m.mu.Lock()
+	m.debugOn, m.debugPath = on, path
+	m.mu.Unlock()
+}
+
+// SetLearned stores the devices seen in the last learn scan.
+func (m *Model) SetLearned(d []verify.Observation) {
+	m.mu.Lock()
+	m.learned = d
+	m.mu.Unlock()
+}
+
+// ToggleHelp shows/hides the help overlay (the `?` key).
+func (m *Model) ToggleHelp() { m.mu.Lock(); m.helpOpen = !m.helpOpen; m.mu.Unlock() }
+
+// HelpOpen reports whether the help overlay is showing.
+func (m *Model) HelpOpen() bool { m.mu.Lock(); defer m.mu.Unlock(); return m.helpOpen }
+
+// CycleFocus moves scroll focus to the next table (the Tab key).
+func (m *Model) CycleFocus() {
+	m.mu.Lock()
+	m.focus = (m.focus + 1) % 2
+	m.mu.Unlock()
+}
+
+// clampScrollLocked bounds both offsets to their content. Caller holds mu.
+func (m *Model) clampScrollLocked() {
+	if m.crowdScroll > m.crowdMax {
+		m.crowdScroll = m.crowdMax
+	}
+	if m.crowdScroll < 0 {
+		m.crowdScroll = 0
+	}
+	if m.learnScroll > m.learnMax {
+		m.learnScroll = m.learnMax
+	}
+	if m.learnScroll < 0 {
+		m.learnScroll = 0
+	}
+}
+
+// SetScrollBounds recomputes each table's max scroll offset from its content and
+// the given per-table viewport row count, then re-clamps the offsets. The render
+// loop calls it each frame with dashboard.TableRows(height).
+func (m *Model) SetScrollBounds(viewportRows int) {
+	m.mu.Lock()
+	m.viewport = viewportRows
+	if m.crowdMax = len(m.vendorHist) - viewportRows; m.crowdMax < 0 {
+		m.crowdMax = 0
+	}
+	if m.learnMax = len(m.learned) - viewportRows; m.learnMax < 0 {
+		m.learnMax = 0
+	}
+	m.clampScrollLocked()
+	m.mu.Unlock()
+}
+
+// ScrollPage moves the focused table by ~one page (dir -1 = up, +1 = down).
+func (m *Model) ScrollPage(dir int) {
+	m.mu.Lock()
+	step := m.viewport - 1
+	if step < 1 {
+		step = 1
+	}
+	if m.focus == FocusLearned {
+		m.learnScroll += dir * step
+	} else {
+		m.crowdScroll += dir * step
+	}
+	m.clampScrollLocked()
+	m.mu.Unlock()
+}
+
+// Scroll moves the focused table by delta rows (negative = up), clamped.
+func (m *Model) Scroll(delta int) {
+	m.mu.Lock()
+	if m.focus == FocusLearned {
+		m.learnScroll += delta
+	} else {
+		m.crowdScroll += delta
+	}
+	m.clampScrollLocked()
+	m.mu.Unlock()
+}
+
+// ScrollToEnd jumps the focused table to top (start=true) or bottom.
+func (m *Model) ScrollToEnd(top bool) {
+	m.mu.Lock()
+	if m.focus == FocusLearned {
+		if top {
+			m.learnScroll = 0
+		} else {
+			m.learnScroll = m.learnMax
+		}
+	} else {
+		if top {
+			m.crowdScroll = 0
+		} else {
+			m.crowdScroll = m.crowdMax
+		}
+	}
 	m.mu.Unlock()
 }
 
@@ -198,6 +356,14 @@ type Snapshot struct {
 	LearnLine   string
 	AppleMode   string
 	TrackersOn  bool
+	Paused      bool
+	HelpOpen    bool
+	DebugOn     bool
+	DebugPath   string
+	Learned     []verify.Observation
+	Focus       FocusTarget
+	CrowdScroll int
+	LearnScroll int
 }
 
 // Snapshot copies the current state under lock.
@@ -233,5 +399,13 @@ func (m *Model) Snapshot() Snapshot {
 		LearnLine:   m.learnLine,
 		AppleMode:   m.appleMode,
 		TrackersOn:  m.trackersOn,
+		Paused:      m.paused,
+		HelpOpen:    m.helpOpen,
+		DebugOn:     m.debugOn,
+		DebugPath:   m.debugPath,
+		Learned:     append([]verify.Observation(nil), m.learned...),
+		Focus:       m.focus,
+		CrowdScroll: m.crowdScroll,
+		LearnScroll: m.learnScroll,
 	}
 }

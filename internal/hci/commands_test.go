@@ -109,6 +109,9 @@ func TestParseAdvReports(t *testing.T) {
 	if string(rs[0].Data) != string([]byte{0x02, 0x01, 0x06}) {
 		t.Errorf("data = % x", rs[0].Data)
 	}
+	if rs[0].RSSI != -59 { // 0xC5 as signed dBm
+		t.Errorf("RSSI = %d, want -59", rs[0].RSSI)
+	}
 	// A connectable report (ADV_IND = 0x00).
 	pkt[5] = 0x00
 	if rs := parseAdvReports(pkt); !rs[0].Connectable {

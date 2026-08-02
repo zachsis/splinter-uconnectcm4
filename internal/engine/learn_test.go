@@ -96,6 +96,43 @@ func TestLearnWeightsCapDominance(t *testing.T) {
 	}
 }
 
+// nameAD builds a Complete Local Name AD structure.
+func nameAD(name string) []byte {
+	return append([]byte{byte(1 + len(name)), 0x09}, name...)
+}
+
+func TestBuildLearnedDevices(t *testing.T) {
+	addr1 := [6]byte{1}
+	addr2 := [6]byte{2}
+	reports := []hci.AdvReport{
+		// addr1, first sighting: weak RSSI, carries the company ID but no name.
+		{Addr: addr1, RSSI: -70, Data: advWithCompany(0x0075).Data},
+		// addr1, second sighting: stronger RSSI, carries a name but no mfg data.
+		{Addr: addr1, RSSI: -50, Data: nameAD("Phone")},
+		// addr2, single sighting.
+		{Addr: addr2, RSSI: -40, Data: advWithCompany(0x1234).Data},
+	}
+
+	got := buildLearnedDevices(reports)
+	if len(got) != 2 {
+		t.Fatalf("want 2 distinct devices, got %d: %+v", len(got), got)
+	}
+	// Sorted by descending RSSI: addr2 (-40) before addr1 (-50).
+	if got[0].MAC != addr2 || got[1].MAC != addr1 {
+		t.Fatalf("want addr2 then addr1 (RSSI desc), got %+v", got)
+	}
+	d1 := got[1]
+	if d1.RSSI != -50 {
+		t.Errorf("addr1 RSSI = %d, want -50 (the stronger sighting)", d1.RSSI)
+	}
+	if d1.Name != "Phone" {
+		t.Errorf("addr1 Name = %q, want %q (filled in from the earlier sighting)", d1.Name, "Phone")
+	}
+	if !d1.HasMfg || d1.CompanyID != 0x0075 {
+		t.Errorf("addr1 mfg = (%v, %#04x), want (true, 0x0075) (filled in from the earlier sighting)", d1.HasMfg, d1.CompanyID)
+	}
+}
+
 func TestLearnControlRequestAndStatus(t *testing.T) {
 	l := NewLearnControl()
 	if l.Learning() || l.Summary() != "" {

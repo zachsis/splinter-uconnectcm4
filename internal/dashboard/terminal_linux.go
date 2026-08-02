@@ -12,9 +12,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// rateStepMs is how much each +/- keypress changes the rotation interval.
-const rateStepMs = 25
-
 // IsTerminal reports whether fd refers to a terminal.
 func IsTerminal(fd uintptr) bool {
 	_, err := unix.IoctlGetTermios(int(fd), unix.TCGETS)
@@ -53,29 +50,38 @@ func restoreTerm(fd int, old *unix.Termios) {
 }
 
 // Run drives the dashboard: it puts the terminal into raw mode + the alternate
-// screen, reads keypresses (+/- rate, q quit), redraws ~4x/sec until ctx is
-// cancelled, then fully restores the terminal on return (including panic unwind).
-func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func(), learn LearnController, apple AppleController, trackers TrackerController) {
+// screen, reads keypresses, mirrors the live control state into the model, and
+// redraws ~4x/sec until ctx is cancelled — then fully restores the terminal on
+// return (including panic unwind).
+func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, c Controls) {
 	inFd := int(os.Stdin.Fd())
 	if old, err := enableRaw(inFd); err == nil {
 		defer restoreTerm(inFd, old)
-		go readKeys(ctx, m, rate, onQuit, learn, apple, trackers)
+		go readKeys(ctx, m, c)
 	}
 
 	fmt.Fprint(out, "\x1b[?1049h\x1b[?25l")       // alt screen + hide cursor
 	defer fmt.Fprint(out, "\x1b[?25h\x1b[?1049l") // restore cursor + main screen
 
 	draw := func() {
-		if learn != nil {
-			m.SetLearn(learn.Learning(), learn.Summary())
+		if c.Learn != nil {
+			m.SetLearn(c.Learn.Learning(), c.Learn.Summary())
+			m.SetLearned(c.Learn.Devices())
 		}
-		if apple != nil {
-			m.SetAppleMode(apple.Mode())
+		if c.Apple != nil {
+			m.SetAppleMode(c.Apple.Mode())
 		}
-		if trackers != nil {
-			m.SetTrackers(trackers.Enabled())
+		if c.Trackers != nil {
+			m.SetTrackers(c.Trackers.Enabled())
+		}
+		if c.Broadcast != nil {
+			m.SetPaused(c.Broadcast.Paused())
+		}
+		if c.Debug != nil {
+			m.SetDebug(c.Debug.Enabled(), c.Debug.Path())
 		}
 		w, h := termSize(fd)
+		m.SetScrollBounds(TableRows(h))
 		fmt.Fprint(out, "\x1b[H\x1b[2J"+RenderFrame(m.Snapshot(), w, h))
 	}
 	draw()
@@ -92,48 +98,44 @@ func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdju
 	}
 }
 
-// readKeys reads single keypresses and applies them until ctx is cancelled. It
-// uses a short read deadline so it can observe cancellation promptly.
-func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func(), learn LearnController, apple AppleController, trackers TrackerController) {
-	buf := make([]byte, 1)
+// readKeys reads keypresses (including multi-byte escape sequences) and applies
+// them until ctx is cancelled. A short read deadline lets it observe cancellation
+// and doubles as the ESC-delay: an incomplete escape sequence is carried to the
+// next read, and a read timeout flushes it (so a genuine lone ESC isn't stuck).
+func readKeys(ctx context.Context, m *Model, c Controls) {
+	buf := make([]byte, 32)
+	var carry []byte
 	for ctx.Err() == nil {
 		_ = os.Stdin.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 		n, err := os.Stdin.Read(buf)
 		if err != nil {
 			if os.IsTimeout(err) {
+				if len(carry) > 0 { // no continuation arrived; treat ESC as standalone
+					forceInput(carry, m, c)
+					carry = nil
+				}
 				continue
 			}
 			return
 		}
-		if n == 0 {
-			continue
-		}
-		switch buf[0] {
-		case 'q', 'Q', 0x03: // 0x03 = Ctrl-C (if ISIG is off)
-			onQuit()
+		data := make([]byte, len(carry)+n) // fresh buffer: never aliases carry
+		copy(data, carry)
+		copy(data[len(carry):], buf[:n])
+		consumed, quit := handleInput(data, m, c)
+		if quit {
 			return
-		case '+', '=':
-			if rate != nil {
-				m.SetRate(rate.Adjust(-rateStepMs)) // shorter interval = faster
-			}
-		case '-', '_':
-			if rate != nil {
-				m.SetRate(rate.Adjust(+rateStepMs)) // longer interval = slower
-			}
-		case 't', 'T':
-			m.CycleTheme()
-		case 'l', 'L':
-			if learn != nil {
-				learn.Request()
-			}
-		case 'a', 'A':
-			if apple != nil {
-				m.SetAppleMode(apple.Cycle())
-			}
-		case 's', 'S':
-			if trackers != nil {
-				m.SetTrackers(trackers.Toggle())
-			}
+		}
+		carry = append(carry[:0], data[consumed:]...)
+	}
+}
+
+// forceInput flushes a carried incomplete escape sequence when no continuation
+// arrived, so the ESC never wedges. A lone/partial CSI has no bound action, so
+// this is effectively a no-op beyond clearing the buffer.
+func forceInput(data []byte, m *Model, c Controls) {
+	for i := 1; i < len(data); i++ { // skip the leading ESC
+		if handleSingle(data[i], m, c) {
+			return
 		}
 	}
 }

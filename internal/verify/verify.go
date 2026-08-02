@@ -13,10 +13,12 @@ import (
 	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
 )
 
-// Observation is one advertising report seen by the scanner.
+// Observation is one advertising report seen by the scanner. It doubles as the
+// learned-device record shown in the dashboard, so it also carries RSSI.
 type Observation struct {
 	MAC                  [6]byte
 	Connectable          bool
+	RSSI                 int8   // signal strength in dBm (0 if not captured)
 	CompanyID            uint16 // valid only when HasMfg
 	HasMfg               bool
 	Name                 string

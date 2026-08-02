@@ -36,6 +36,7 @@ const (
 type AdvReport struct {
 	Addr        [6]byte
 	Connectable bool
+	RSSI        int8   // signal strength in dBm (e.g. -60); 0x7F means unavailable
 	Data        []byte // raw advertising payload (AD structures)
 }
 
@@ -65,6 +66,7 @@ func parseAdvReports(pkt []byte) []AdvReport {
 		copy(r.Addr[:], p[2:8])
 		r.Connectable = evType == 0x00 || evType == 0x01 // ADV_IND / ADV_DIRECT_IND
 		r.Data = append([]byte(nil), p[9:9+dataLen]...)
+		r.RSSI = int8(p[9+dataLen]) // trailing signed dBm byte
 		out = append(out, r)
 		p = p[9+dataLen+1:] // advance past this report (incl. RSSI byte)
 	}

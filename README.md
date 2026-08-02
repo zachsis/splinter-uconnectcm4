@@ -87,12 +87,14 @@ splinterd [flags]
 | `--duration` | 10s | `--benchmark` run time |
 | `--hci` | 0 | HCI device index to drive (`hciX`) |
 | `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or under systemd) |
-| `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `mono` (honors `NO_COLOR`) |
+| `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `ocean` / `synthwave` / `gruvbox` / `dracula` / `mono` (honors `NO_COLOR`) |
 | `--learn-window` | 15s | learn-mode passive scan window (dashboard `l` key) |
 | `--apple-mode` | naive | Apple decoy mode: `off` / `naive` / `nearform` (dashboard `a` cycles live) |
 | `--apple-share` | 15 | % of decoys that impersonate Apple when `--apple-mode` ≠ off |
 | `--trackers` | false | emit service-data trackers Tile + Fast Pair (dashboard `s` toggles live) |
 | `--tracker-share` | 20 | % of decoys that are service-data trackers when `--trackers` is on |
+| `--debug` | false | write a debug log of engine activity to a file (dashboard `D` toggles live) |
+| `--log-file` | | debug log path (default: a timestamped `splinterd-<ts>.log` in the current dir) |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
@@ -128,8 +130,19 @@ The dashboard shows a **multi-row rate graph**, a compact fails sparkline, the
 current fake identity, and an **htop-style vendor "crowd" table** (name · bar ·
 count). **Hotkeys**: `+`/`-` raise/lower the live rate (clamped to the visibility
 floor), `t` cycles the color theme, `l` runs **learn mode**, `a` cycles **Apple
-mode**, `s` toggles **service-data trackers**, and `q` (or Ctrl-C) quits. Pick a
-starting palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
+mode**, `s` toggles **service-data trackers**, `Space` **stops/starts**
+broadcasting, `Tab` switches which table has scroll focus, `↑`/`↓`/`PgUp`/`PgDn`/
+`Home`/`End` (or `j`/`k`/`g`/`G`) scroll it, `D` toggles a **debug log file**,
+`?` shows the full **help overlay**, and `q` (or Ctrl-C) quits. Pick a starting
+palette with `--theme` (matrix/amber/neon/ocean/synthwave/gruvbox/dracula/mono).
+
+The dashboard has two scrollable tables: the vendor **crowd** and, after a learn
+scan, a **learned-devices** table listing the real devices around you (MAC,
+signal strength, and company/service ID). **Space** pauses broadcasting while
+keeping the adapter, so you can freeze the display without handing Bluetooth
+back. **`D`** (or `--debug` / `--log-file`) writes a timestamped log of engine
+activity — decoy mints, rate, learn events — to a `0600` file in the current
+directory; it's silent until armed, so it never disturbs the display.
 
 **Learn mode** (`l`): pauses advertising, passively scans nearby BLE for
 `--learn-window` (default 15 s), and then **weights the decoys toward the vendor

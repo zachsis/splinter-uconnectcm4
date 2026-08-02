@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- **Dashboard v3** (#27): a `?` help overlay listing every hotkey; `Space` to
+  stop/start broadcasting (keeps the adapter); a **learned-devices** table
+  (MAC · RSSI · company/service ID) populated by learn scans; scrollable crowd
+  and learned tables (`Tab` to focus, arrows/PgUp/PgDn/Home/End or `j`/`k`/`g`/`G`);
+  four new color themes (ocean, synthwave, gruvbox, dracula); and a `D` debug log
+  toggle writing a timestamped `0600` file, plus `--debug` / `--log-file` flags
+  for headless runs. RSSI is now captured from advertising reports.
+
+### Added
 - **Apple decoy impersonation** (`--apple-mode`, dashboard `a` key): blend in as an
   iPhone to hide real Apple devices. `naive` (default) emits Apple's `0x004C`
   company ID; `nearform` emits a well-formed Continuity Nearby Info beacon; `off`

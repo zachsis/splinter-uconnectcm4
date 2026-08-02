@@ -23,6 +23,8 @@ type Config struct {
 	AppleShare   int           // % of decoys that impersonate Apple when AppleMode != off
 	Trackers     bool          // emit service-data trackers (Tile/Fast Pair); dashboard 's' toggles live
 	TrackerShare int           // % of decoys that are service-data trackers when Trackers is on
+	Debug        bool          // write a debug log file of engine activity (dashboard 'D' toggles live)
+	LogFile      string        // explicit debug log path; empty => timestamped splinterd-<ts>.log in cwd
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }
