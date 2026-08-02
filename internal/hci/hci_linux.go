@@ -160,8 +160,11 @@ func (c *Conn) Scan(window time.Duration) ([]AdvReport, error) {
 	for time.Now().Before(deadline) {
 		n, err := unix.Read(c.userFd, buf)
 		if err != nil {
-			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
-				continue // SO_RCVTIMEO tick; keep scanning until the deadline
+			// EAGAIN = SO_RCVTIMEO tick; EINTR = a signal interrupted the blocking
+			// read (Go's runtime routinely signals goroutines for preemption, which
+			// is common over a multi-second scan). Both just mean "keep scanning".
+			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) || errors.Is(err, unix.EINTR) {
+				continue
 			}
 			return reports, fmt.Errorf("scan read: %w", err)
 		}
@@ -183,6 +186,9 @@ func (c *Conn) sendCommand(ogf, ocf uint16, params []byte) (byte, error) {
 	for time.Now().Before(deadline) {
 		n, err := unix.Read(c.userFd, buf)
 		if err != nil {
+			if errors.Is(err, unix.EINTR) {
+				continue // signal interruption; retry until the deadline
+			}
 			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
 				return 0, fmt.Errorf("timeout awaiting reply to opcode %#04x", want)
 			}
@@ -229,6 +235,9 @@ func (c *Conn) mgmtSetPowered(on bool) error {
 	for time.Now().Before(deadline) {
 		n, err := unix.Read(c.ctrlFd, buf)
 		if err != nil {
+			if errors.Is(err, unix.EINTR) {
+				continue // signal interruption; retry until the deadline
+			}
 			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
 				return errors.New("timeout awaiting mgmt set-powered reply")
 			}
