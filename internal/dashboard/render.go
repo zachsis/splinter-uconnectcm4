@@ -190,6 +190,9 @@ func RenderFrame(s Snapshot, width, height int) string {
 	if s.AppleMode != "" && s.AppleMode != "off" {
 		header += " · apple " + s.AppleMode
 	}
+	if s.TrackersOn {
+		header += " · trackers on"
+	}
 	fmt.Fprintf(&b, "%s\n\n", paint(t.Header, header))
 	fmt.Fprintf(&b, "  %s %s     %s %d     Bluetooth hci0 (exclusive)\n\n",
 		paint(t.Label, "uptime"), fmtDur(s.Uptime), paint(t.Label, "total"), s.Total)
@@ -232,6 +235,6 @@ func RenderFrame(s Snapshot, width, height int) string {
 	for _, line := range crowdTable(s.Vendors, width-4, crowdRows) {
 		fmt.Fprintf(&b, "    %s\n", paint(t.Value, line))
 	}
-	b.WriteString("\n  " + paint(t.Dim, "+/- rate  ·  t theme  ·  l learn  ·  a apple  ·  q/Ctrl-C quit") + "\n")
+	b.WriteString("\n  " + paint(t.Dim, "+/- rate  ·  t theme  ·  l learn  ·  a apple  ·  s trackers  ·  q/Ctrl-C quit") + "\n")
 	return b.String()
 }

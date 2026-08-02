@@ -25,7 +25,7 @@ func TestLearnWeights(t *testing.T) {
 	}
 	reports = append(reports, advWithCompany(0x1234)) // not in our table
 
-	weights, summary := learnWeights(reports)
+	weights, _, summary := learnWeights(reports)
 	if len(weights) != len(decoy.Vendors) {
 		t.Fatalf("weights len = %d, want %d", len(weights), len(decoy.Vendors))
 	}
@@ -82,7 +82,7 @@ func TestLearnWeightsCapDominance(t *testing.T) {
 	for i := 0; i < 500; i++ { // only Samsung, and a LOT of it
 		reports = append(reports, advWithCompany(0x0075))
 	}
-	weights, _ := learnWeights(reports)
+	weights, _, _ := learnWeights(reports)
 	total, top := 0, 0
 	for _, w := range weights {
 		total += w
@@ -108,9 +108,12 @@ func TestLearnControlRequestAndStatus(t *testing.T) {
 	if l.takeRequest() {
 		t.Fatal("takeRequest should be false the second time")
 	}
-	l.setResult([]int{1, 2, 3}, "Samsung 5")
+	l.setResult([]int{1, 2, 3}, []int{4, 7}, "Samsung 5")
 	if got := l.weightsSnapshot(); len(got) != 3 || got[1] != 2 {
 		t.Fatalf("weights snapshot wrong: %v", got)
+	}
+	if got := l.trackerWeightsSnapshot(); len(got) != 2 || got[1] != 7 {
+		t.Fatalf("tracker weights snapshot wrong: %v", got)
 	}
 	if l.Summary() != "Samsung 5" {
 		t.Fatalf("summary = %q", l.Summary())

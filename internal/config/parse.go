@@ -32,6 +32,8 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.DurationVar(&cfg.LearnWindow, "learn-window", cfg.LearnWindow, "learn-mode passive scan window (dashboard 'l' key)")
 	fs.StringVar(&cfg.AppleMode, "apple-mode", cfg.AppleMode, "Apple decoy mode: off|naive|nearform (alias: nearby-info) (dashboard 'a' cycles live)")
 	fs.IntVar(&cfg.AppleShare, "apple-share", cfg.AppleShare, "percent of decoys that impersonate Apple when apple-mode != off (0-100)")
+	fs.BoolVar(&cfg.Trackers, "trackers", cfg.Trackers, "emit service-data trackers Tile + Fast Pair (dashboard 's' toggles live)")
+	fs.IntVar(&cfg.TrackerShare, "tracker-share", cfg.TrackerShare, "percent of decoys that are service-data trackers when --trackers is on (0-100)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")
@@ -82,6 +84,9 @@ func (c Config) Validate() error {
 	}
 	if c.AppleShare < 0 || c.AppleShare > 100 {
 		return fmt.Errorf("--apple-share must be 0..100, got %d", c.AppleShare)
+	}
+	if c.TrackerShare < 0 || c.TrackerShare > 100 {
+		return fmt.Errorf("--tracker-share must be 0..100, got %d", c.TrackerShare)
 	}
 	return nil
 }

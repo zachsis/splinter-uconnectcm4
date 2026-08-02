@@ -26,15 +26,17 @@ func scan(index int, window time.Duration) ([]verify.Observation, error) {
 
 	obs := make([]verify.Observation, 0, len(reports))
 	for _, r := range reports {
-		id, hasMfg, name, fastPair, appleFindMy := verify.ParseAdvData(r.Data)
+		info := verify.ParseAdvData(r.Data)
 		obs = append(obs, verify.Observation{
-			MAC:         r.Addr,
-			Connectable: r.Connectable,
-			CompanyID:   id,
-			HasMfg:      hasMfg,
-			Name:        name,
-			FastPair:    fastPair,
-			AppleFindMy: appleFindMy,
+			MAC:                  r.Addr,
+			Connectable:          r.Connectable,
+			CompanyID:            info.CompanyID,
+			HasMfg:               info.HasMfg,
+			Name:                 info.Name,
+			FastPair:             info.FastPair,
+			FastPairDiscoverable: info.FastPairDiscoverable,
+			AppleFindMy:          info.AppleFindMy,
+			Tile:                 info.Tile,
 		})
 	}
 	return obs, nil

@@ -48,7 +48,7 @@ func (r LogReporter) Rate(devPerSec, fails int) {
 // Run drives the rotation loop until ctx is cancelled. Advertising parameters
 // are set once up front; each cycle then disables advertising, mints a fresh
 // random MAC + decoy payload, and re-enables. On return, advertising is disabled.
-func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl, apple *AppleControl) error {
+func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl, apple *AppleControl, trackers *TrackerControl) error {
 	rng := newRNG()
 
 	if rate == nil {
@@ -98,19 +98,23 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 				learn.setSummary("scan failed: " + err.Error())
 				log.Warn("learn: scan failed", "err", err)
 			} else {
-				w, summary := learnWeights(reports)
-				learn.setResult(w, summary)
+				w, tw, summary := learnWeights(reports)
+				learn.setResult(w, tw, summary)
 				log.Info("learn: reweighted decoys", "observed", summary)
 			}
 			learn.setLearning(false)
 		}
 
-		opts := decoy.Options{AppleShare: cfg.AppleShare}
+		opts := decoy.Options{AppleShare: cfg.AppleShare, TrackerShare: cfg.TrackerShare}
 		if apple != nil {
 			opts.Apple = apple.Kind()
 		}
+		if trackers != nil {
+			opts.Trackers = trackers.Enabled()
+		}
 		if learn != nil {
 			opts.Weights = learn.weightsSnapshot()
+			opts.TrackerWeights = learn.trackerWeightsSnapshot()
 		}
 		addr, d, err := cycle(ctrl, cfg, rng, opts)
 		if err != nil {

@@ -2,12 +2,17 @@ package decoy
 
 import "fmt"
 
-// CompanyLabel maps a Bluetooth SIG company ID to a friendly vendor name for
-// display, falling back to the hex ID for unknown vendors.
+// CompanyLabel maps a Bluetooth SIG company ID, or one of the service-data
+// tracker UUIDs (ServiceTile / ServiceGoogleFastPair) reused as display IDs, to
+// a friendly name — falling back to the hex ID for unknown vendors.
 func CompanyLabel(id uint16) string {
 	switch id {
 	case CompanyApple:
 		return "Apple"
+	case ServiceTile:
+		return "Tile"
+	case ServiceGoogleFastPair:
+		return "Fast Pair"
 	case 0x0075:
 		return "Samsung"
 	case 0x00E0:

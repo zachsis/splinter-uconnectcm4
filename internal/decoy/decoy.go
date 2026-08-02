@@ -13,9 +13,11 @@ import (
 
 // Advertising Data (AD) types, from the Bluetooth assigned-numbers registry.
 const (
-	adFlags   = 0x01 // Flags
-	adName    = 0x09 // Complete Local Name
-	adMfgData = 0xFF // Manufacturer Specific Data
+	adFlags         = 0x01 // Flags
+	adServiceUUID16 = 0x03 // Complete list of 16-bit Service Class UUIDs
+	adName          = 0x09 // Complete Local Name
+	adServiceData16 = 0x16 // Service Data - 16-bit UUID
+	adMfgData       = 0xFF // Manufacturer Specific Data
 )
 
 // flagsValue = LE General Discoverable | BR/EDR Not Supported.
@@ -48,8 +50,14 @@ func RandomStaticAddr(rng *rand.Rand) [6]byte {
 // Decoy is a generated fake identity: the serialized advertising payload plus
 // the vendor it impersonates (surfaced for status/dashboard reporting).
 type Decoy struct {
-	AD        []byte // <=31-byte legacy advertising payload
-	CompanyID uint16 // the chosen vendor's Bluetooth SIG company ID
+	AD []byte // <=31-byte legacy advertising payload
+	// CompanyID is the display/grouping ID surfaced to Reporter.Decoy and the
+	// dashboard's vendor histogram. For manufacturer-data decoys it is the
+	// vendor's Bluetooth SIG company ID; for service-data trackers (buildTile,
+	// buildFastPair) it is instead the tracker's service UUID (ServiceTile /
+	// ServiceGoogleFastPair) — a different numeric namespace, reused here only
+	// because CompanyLabel knows how to render both.
+	CompanyID uint16
 	Name      string // the advertised name, or "" if none was emitted
 }
 
@@ -94,17 +102,23 @@ func BuildWeighted(cfg config.Config, rng *rand.Rand, weights []int) Decoy {
 // Options selects which payload kinds a decoy may take. The zero value emits
 // only manufacturer-data vendor decoys (the original behavior).
 type Options struct {
-	Weights    []int     // vendor weighting (learn mode); nil/invalid => uniform
-	Apple      AppleKind // Apple impersonation mode
-	AppleShare int       // % chance an eligible decoy impersonates Apple (Apple != off)
+	Weights        []int     // vendor weighting (learn mode); nil/invalid => uniform
+	Apple          AppleKind // Apple impersonation mode
+	AppleShare     int       // % chance an eligible decoy impersonates Apple (Apple != off)
+	Trackers       bool      // emit service-data trackers (Tile / Fast Pair) into the mix
+	TrackerShare   int       // % chance an eligible decoy is a service-data tracker
+	TrackerWeights []int     // [Tile, FastPair] learn weighting; nil/invalid => uniform
 }
 
 // BuildWithOpts generates one decoy, choosing its payload kind per opts: an
-// Apple decoy with probability AppleShare when Apple impersonation is enabled,
-// otherwise a weighted manufacturer-data vendor decoy.
+// Apple decoy with probability AppleShare, else a service-data tracker with
+// probability TrackerShare, else a weighted manufacturer-data vendor decoy.
 func BuildWithOpts(cfg config.Config, rng *rand.Rand, opts Options) Decoy {
 	if opts.Apple != AppleOff && opts.AppleShare > 0 && rng.IntN(100) < opts.AppleShare {
 		return buildApple(rng, opts.Apple)
+	}
+	if opts.Trackers && opts.TrackerShare > 0 && rng.IntN(100) < opts.TrackerShare {
+		return buildTracker(rng, opts.TrackerWeights)
 	}
 	return buildFor(cfg, rng, Vendors[pickVendor(rng, opts.Weights)])
 }

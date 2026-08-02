@@ -142,15 +142,17 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 			learn := engine.NewLearnControl()
 			apple := engine.NewAppleControl(appleKind(cfg))
 			m.SetAppleMode(apple.Mode())
+			trackers := engine.NewTrackerControl(cfg.Trackers)
+			m.SetTrackers(trackers.Enabled())
 			scanner, _ := conn.(engine.Scanner) // *hci.Conn scans; nil disables learn
 			done := make(chan struct{})
 			go func() {
-				dashboard.Run(runCtx, m, os.Stdout, os.Stdout.Fd(), rate, runCancel, learn, apple)
+				dashboard.Run(runCtx, m, os.Stdout, os.Stdout.Fd(), rate, runCancel, learn, apple, trackers)
 				close(done)
 			}()
 			// Logs would corrupt the frame, so silence the engine's logger while
 			// the dashboard owns the screen.
-			err := engine.Run(runCtx, conn, cfg, quietLogger(), m, rate, scanner, learn, apple)
+			err := engine.Run(runCtx, conn, cfg, quietLogger(), m, rate, scanner, learn, apple, trackers)
 			runCancel()
 			<-done // wait for the terminal to be restored
 			return err
@@ -160,7 +162,8 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 
 	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
 	apple := engine.NewAppleControl(appleKind(cfg))
-	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log}, nil, nil, nil, apple)
+	trackers := engine.NewTrackerControl(cfg.Trackers)
+	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log}, nil, nil, nil, apple, trackers)
 }
 
 // appleKind resolves the validated cfg.AppleMode string to an engine AppleKind.

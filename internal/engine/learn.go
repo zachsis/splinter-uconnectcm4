@@ -23,11 +23,12 @@ type Scanner interface {
 // reweights decoy selection toward the observed vendor mix). Safe for concurrent
 // use.
 type LearnControl struct {
-	mu        sync.Mutex
-	requested bool
-	learning  bool
-	weights   []int
-	summary   string
+	mu             sync.Mutex
+	requested      bool
+	learning       bool
+	weights        []int
+	trackerWeights []int // [Tile, FastPair], parallel to decoy.TrackerKind
+	summary        string
 }
 
 // NewLearnControl returns an idle learn control.
@@ -54,9 +55,10 @@ func (l *LearnControl) setLearning(v bool) {
 	l.mu.Unlock()
 }
 
-func (l *LearnControl) setResult(weights []int, summary string) {
+func (l *LearnControl) setResult(weights, trackerWeights []int, summary string) {
 	l.mu.Lock()
 	l.weights = weights
+	l.trackerWeights = trackerWeights
 	l.summary = summary
 	l.mu.Unlock()
 }
@@ -76,6 +78,15 @@ func (l *LearnControl) weightsSnapshot() []int {
 		return nil
 	}
 	return append([]int(nil), l.weights...)
+}
+
+func (l *LearnControl) trackerWeightsSnapshot() []int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.trackerWeights == nil {
+		return nil
+	}
+	return append([]int(nil), l.trackerWeights...)
 }
 
 // Learning reports whether a learning scan is currently running.
@@ -128,12 +139,22 @@ func learnBoost(obs int) int {
 // learnWeights builds decoy weights (parallel to decoy.Vendors) from observed
 // advertisements: a floor per vendor plus a dampened, capped boost for the
 // company IDs actually seen nearby, so present vendors are favored while the
-// crowd stays diverse. Returns a short summary of the top in-table vendors.
-func learnWeights(reports []hci.AdvReport) ([]int, string) {
+// crowd stays diverse. It also builds tracker weights ([Tile, FastPair]) from
+// observed service-data trackers, using the same floor+boost. Returns the vendor
+// weights, the tracker weights, and a short summary of what was seen.
+func learnWeights(reports []hci.AdvReport) (vendorWeights, trackerWeights []int, summary string) {
 	obs := map[uint16]int{}
+	var tileN, fastpairN int
 	for _, r := range reports {
-		if id, hasMfg, _, _, _ := verify.ParseAdvData(r.Data); hasMfg {
-			obs[id]++
+		info := verify.ParseAdvData(r.Data)
+		if info.HasMfg {
+			obs[info.CompanyID]++
+		}
+		if info.Tile {
+			tileN++
+		}
+		if info.FastPair {
+			fastpairN++
 		}
 	}
 	weights := make([]int, len(decoy.Vendors))
@@ -141,6 +162,10 @@ func learnWeights(reports []hci.AdvReport) ([]int, string) {
 	for i, v := range decoy.Vendors {
 		weights[i] = learnBaseWeight + learnBoost(obs[v.CompanyID])
 		inTable[v.CompanyID] = true
+	}
+	trackerWeights = []int{
+		decoy.TrackerTile:     learnBaseWeight + learnBoost(tileN),
+		decoy.TrackerFastPair: learnBaseWeight + learnBoost(fastpairN),
 	}
 
 	type vc struct {
@@ -162,6 +187,12 @@ func learnWeights(reports []hci.AdvReport) ([]int, string) {
 		}
 		parts = append(parts, fmt.Sprintf("%s %d", decoy.CompanyLabel(v.id), v.n))
 	}
+	if tileN > 0 {
+		parts = append(parts, fmt.Sprintf("Tile %d", tileN))
+	}
+	if fastpairN > 0 {
+		parts = append(parts, fmt.Sprintf("Fast Pair %d", fastpairN))
+	}
 
 	// Distinguish "scan saw manufacturer adverts but none we can impersonate"
 	// (e.g. an all-Apple room) from "scan saw nothing" — otherwise a working
@@ -170,12 +201,12 @@ func learnWeights(reports []hci.AdvReport) ([]int, string) {
 	for _, n := range obs {
 		totalMfg += n
 	}
-	summary := "no manufacturer adverts seen"
+	summary = "no manufacturer adverts seen"
 	switch {
 	case len(parts) > 0:
 		summary = strings.Join(parts, " · ")
 	case totalMfg > 0:
 		summary = fmt.Sprintf("%d adverts, none impersonable — crowd stays diverse", totalMfg)
 	}
-	return weights, summary
+	return weights, trackerWeights, summary
 }
