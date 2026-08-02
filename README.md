@@ -89,6 +89,10 @@ splinterd [flags]
 | `--dashboard` | false | live mtr-style terminal dashboard instead of line logs (needs a TTY; falls back to logging when piped or under systemd) |
 | `--theme` | matrix | dashboard color theme: `matrix` / `amber` / `neon` / `mono` (honors `NO_COLOR`) |
 | `--learn-window` | 15s | learn-mode passive scan window (dashboard `l` key) |
+| `--apple-mode` | naive | Apple decoy mode: `off` / `naive` / `nearform` (dashboard `a` cycles live) |
+| `--apple-share` | 15 | % of decoys that impersonate Apple when `--apple-mode` ≠ off |
+| `--trackers` | false | emit service-data trackers Tile + Fast Pair (dashboard `s` toggles live) |
+| `--tracker-share` | 20 | % of decoys that are service-data trackers when `--trackers` is on |
 | `--verbose` | false | debug logging |
 | `--version` / `--help` | | print and exit |
 
@@ -123,14 +127,33 @@ back to line logging.
 The dashboard shows a **multi-row rate graph**, a compact fails sparkline, the
 current fake identity, and an **htop-style vendor "crowd" table** (name · bar ·
 count). **Hotkeys**: `+`/`-` raise/lower the live rate (clamped to the visibility
-floor), `t` cycles the color theme, `l` runs **learn mode**, and `q` (or Ctrl-C)
-quits. Pick a starting palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
+floor), `t` cycles the color theme, `l` runs **learn mode**, `a` cycles **Apple
+mode**, `s` toggles **service-data trackers**, and `q` (or Ctrl-C) quits. Pick a
+starting palette with `--theme` (`matrix`/`amber`/`neon`/`mono`).
 
 **Learn mode** (`l`): pauses advertising, passively scans nearby BLE for
 `--learn-window` (default 15 s), and then **weights the decoys toward the vendor
 mix actually around you** (phones, tags, watches, car sensors) so the fakes blend
 in. It never replays real devices' addresses/payloads — it just biases which of
-its own vendor decoys it mints. Press `l` again to re-scan.
+its own vendor decoys it mints. Press `l` again to re-scan. Learn also counts the
+trackers below and tilts their Tile/Fast-Pair split toward what it sees.
+
+**Apple impersonation** (`--apple-mode`, hotkey `a`): most real environments are
+Apple-heavy, so blending in as an iPhone hides your real Apple devices from a
+scanner that buckets by company ID. `naive` (default) emits Apple's `0x004C`
+company ID — enough to defeat company-ID bucketing; `nearform` emits a
+well-formed Continuity **Nearby Info** beacon, indistinguishable from a real
+iPhone to a format-aware fingerprinter; `off` disables it. The `a` hotkey cycles
+off → naive → nearby-info. splinterd **never** emits Apple Find My (`0x12`)
+frames — those would trigger "unknown tracker near you" anti-stalking alerts on
+bystanders.
+
+**Service-data trackers** (`--trackers`, hotkey `s`, off by default): Tile
+(`0xFEED`) and Google Fast Pair (`0xFE2C`) advertise via service data, not
+manufacturer data, so they need their own decoy shape. Fast Pair decoys are
+always **non-discoverable** (an account-key-filter frame with the "hide-UI" type)
+so they read as Fast Pair traffic to a passive collector but never pop a "tap to
+pair" sheet — or any notification — on a bystander's phone.
 
 On the uConsole's **CYW43455**, non-connectable advertising is floored at **100 ms**
 (the legacy `ADV_NONCONN_IND` minimum — the chip rejects lower), so `--dense`

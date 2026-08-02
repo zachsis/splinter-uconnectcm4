@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Added
+- **Apple decoy impersonation** (`--apple-mode`, dashboard `a` key): blend in as an
+  iPhone to hide real Apple devices. `naive` (default) emits Apple's `0x004C`
+  company ID; `nearform` emits a well-formed Continuity Nearby Info beacon; `off`
+  disables it. `--apple-share` sets the fraction of decoys. Never emits Apple Find
+  My (`0x12`) frames (which would trigger anti-stalking alerts). (#25)
+- **Service-data trackers** (`--trackers`, dashboard `s` key, off by default):
+  emit Tile (`0xFEED`) and Google Fast Pair (`0xFE2C`) decoys, which advertise via
+  service data rather than manufacturer data. Fast Pair decoys are always
+  non-discoverable, so they never pop a pairing prompt on bystanders.
+  `--tracker-share` sets the fraction; learn mode counts and tilts the split. (#26)
+
+### Added
 - **Learn mode** (dashboard `l` key): passively scans nearby BLE (`--learn-window`,
   default 15s) and weights decoy selection toward the observed vendor mix — the
   fakes blend into the devices actually around you. Never replays real
