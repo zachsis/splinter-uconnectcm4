@@ -1,6 +1,6 @@
-// Package verify analyzes observed BLE advertisements to confirm splinterd's
+// Package verify analyzes observed BLE advertisements to confirm hohd's
 // decoy crowd matches the expected behavior: enough distinct devices, a spread
-// of vendor IDs, and none of the popup-triggering formats splinterd must never
+// of vendor IDs, and none of the popup-triggering formats hohd must never
 // emit. The parsing and analysis are pure so they are unit-tested without radio.
 package verify
 
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/decoy"
 )
 
 // Observation is one advertising report seen by the scanner. It doubles as the
@@ -41,7 +41,7 @@ type AdInfo struct {
 
 // ParseAdvData walks a raw advertising payload and extracts the fields the
 // harness cares about. Malformed structures are skipped rather than erroring —
-// the scanner sees real-world traffic, not just splinterd's.
+// the scanner sees real-world traffic, not just hohd's.
 func ParseAdvData(data []byte) AdInfo {
 	var info AdInfo
 	for i := 0; i < len(data); {
@@ -130,7 +130,7 @@ type Result struct {
 	Pass         bool
 }
 
-// Analyze evaluates observations. expectedRotateMs is splinterd's --rotate-ms (0
+// Analyze evaluates observations. expectedRotateMs is hohd's --rotate-ms (0
 // = benchmark; skip the rate floor). The rate floor is 50% of the theoretical
 // 1000/rotate devices/sec, since passive scanning never captures every advert.
 func Analyze(obs []Observation, window time.Duration, expectedRotateMs int) Result {

@@ -1,4 +1,4 @@
-module github.com/zachsis/splinter-uconnectcm4
+module github.com/zachsis/helmofhades
 
 go 1.24
 

@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// errUnsupported is returned by all transport operations off Linux. splinterd's
+// errUnsupported is returned by all transport operations off Linux. hohd's
 // HCI transport is Linux-only; this stub lets the tree build and unit-test the
 // pure encoders on any OS (e.g. the dev Mac).
-var errUnsupported = errors.New("splinterd HCI transport requires Linux")
+var errUnsupported = errors.New("hohd HCI transport requires Linux")
 
 // Conn is a non-Linux stub with the same method set as the Linux transport.
 type Conn struct{}

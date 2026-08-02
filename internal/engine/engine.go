@@ -1,4 +1,4 @@
-// Package engine runs splinterd's decoy rotation loop: it continuously retires
+// Package engine runs hohd's decoy rotation loop: it continuously retires
 // the current fake device and mints a new one, producing the churning crowd a
 // scanner observes. It depends only on the small Controller interface, so the
 // loop is unit-tested against a fake without any Bluetooth hardware.
@@ -13,10 +13,10 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
-	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
-	"github.com/zachsis/splinter-uconnectcm4/internal/tune"
+	"github.com/zachsis/helmofhades/internal/config"
+	"github.com/zachsis/helmofhades/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/hci"
+	"github.com/zachsis/helmofhades/internal/tune"
 )
 
 // Controller is the subset of the HCI transport the engine needs. *hci.Conn
@@ -36,7 +36,7 @@ type Reporter interface {
 }
 
 // LogReporter is the default Reporter: it logs the per-second rate via slog,
-// matching splinterd's original line output. Individual decoys are too frequent
+// matching hohd's original line output. Individual decoys are too frequent
 // to log, so Decoy is a no-op.
 type LogReporter struct{ Log *slog.Logger }
 
@@ -72,9 +72,9 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 	defer func() { _ = ctrl.SetAdvEnable(false) }()
 
 	if cfg.Benchmark {
-		log.Info("splinter running", "mode", "benchmark/flood")
+		log.Info("hohd running", "mode", "benchmark/flood")
 	} else {
-		log.Info("splinter running", "mode", "paced", "rotate_ms", cfg.RotateMs)
+		log.Info("hohd running", "mode", "paced", "rotate_ms", cfg.RotateMs)
 	}
 
 	var ok, fail uint64

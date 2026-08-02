@@ -5,8 +5,8 @@ package main
 import (
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/hci"
-	"github.com/zachsis/splinter-uconnectcm4/internal/verify"
+	"github.com/zachsis/helmofhades/internal/hci"
+	"github.com/zachsis/helmofhades/internal/verify"
 )
 
 // scan takes exclusive control of hci<index>, passively scans for the window,

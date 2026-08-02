@@ -35,7 +35,7 @@ func Parse(name string, args []string, out io.Writer) (Config, error) {
 	fs.BoolVar(&cfg.Trackers, "trackers", cfg.Trackers, "emit service-data trackers Tile + Fast Pair (dashboard 's' toggles live)")
 	fs.IntVar(&cfg.TrackerShare, "tracker-share", cfg.TrackerShare, "percent of decoys that are service-data trackers when --trackers is on (0-100)")
 	fs.BoolVar(&cfg.Debug, "debug", cfg.Debug, "write a debug log of engine activity to a file (dashboard 'D' toggles live)")
-	fs.StringVar(&cfg.LogFile, "log-file", cfg.LogFile, "debug log path (default: timestamped splinterd-<ts>.log in the current dir)")
+	fs.StringVar(&cfg.LogFile, "log-file", cfg.LogFile, "debug log path (default: timestamped hohd-<ts>.log in the current dir)")
 	fs.IntVar(&cfg.HCIIndex, "hci", cfg.HCIIndex, "HCI device index to drive (hciX)")
 	fs.BoolVar(&cfg.Verbose, "verbose", cfg.Verbose, "enable debug logging")
 	showVersion := fs.Bool("version", false, "print version and exit")

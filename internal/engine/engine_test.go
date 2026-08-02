@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/config"
+	"github.com/zachsis/helmofhades/internal/decoy"
 )
 
 // fakeCtrl records the sequence of controller calls and can inject an error on a

@@ -249,7 +249,7 @@ func (c *Conn) mgmtSetPowered(on bool) error {
 			case status == MgmtStatusBusy:
 				return errMgmtBusy
 			case status == MgmtStatusPermissionDenied:
-				return errors.New("permission denied powering the controller — run splinterd as root (sudo) or grant it CAP_NET_ADMIN")
+				return errors.New("permission denied powering the controller — run hohd as root (sudo) or grant it CAP_NET_ADMIN")
 			case status != 0:
 				return fmt.Errorf("mgmt set-powered failed, status %#02x", status)
 			}

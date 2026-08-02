@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
-	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
+	"github.com/zachsis/helmofhades/internal/config"
+	"github.com/zachsis/helmofhades/internal/decoy"
 )
 
 func TestResultString(t *testing.T) {

@@ -1,13 +1,13 @@
-# splinterd — build / cross-compile / deploy
-BINARY        := splinterd
-PKG           := ./cmd/splinterd
+# hohd — build / cross-compile / deploy
+BINARY        := hohd
+PKG           := ./cmd/hohd
 DIST          := dist
-UCONSOLE_HOST ?= eris@192.168.68.60
+UCONSOLE_HOST ?= eris@192.168.68.61
 VERSION       := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS       := -X main.version=$(VERSION)
 export GOTOOLCHAIN := local
 
-.PHONY: build build-uconsole deploy install-uconsole test fmt vet check clean
+.PHONY: build build-uconsole deploy test fmt vet check clean
 
 ## build: native build for the host
 build:
@@ -20,11 +20,6 @@ build-uconsole:
 ## deploy: build-uconsole then scp the binary to the device (override UCONSOLE_HOST)
 deploy: build-uconsole
 	scp $(DIST)/$(BINARY)-arm64 $(UCONSOLE_HOST):~/
-
-## install-uconsole: scp binary + unit + installer, then print the on-device step
-install-uconsole: build-uconsole
-	scp $(DIST)/$(BINARY)-arm64 packaging/splinterd.service scripts/install.sh $(UCONSOLE_HOST):~/
-	@echo "On the device: sudo sh install.sh splinterd-arm64 && sudo systemctl enable --now splinterd"
 
 ## test / fmt / vet / check
 test:

@@ -29,7 +29,7 @@ const (
 	// constantly. It does NOT pop any dialog on bystanders.
 	appleNearbyInfoType = 0x10
 	// AppleFindMyType is the "offline finding" (Find My / AirTag) message type.
-	// splinterd must NEVER emit it: a moving, persistent unknown Find My beacon
+	// hohd must NEVER emit it: a moving, persistent unknown Find My beacon
 	// triggers "unknown tracker near you" anti-stalking alerts. Exported so the
 	// verify harness can assert we never emit it.
 	AppleFindMyType = 0x12

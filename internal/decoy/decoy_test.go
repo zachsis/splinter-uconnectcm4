@@ -4,7 +4,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/zachsis/splinter-uconnectcm4/internal/config"
+	"github.com/zachsis/helmofhades/internal/config"
 )
 
 func newRNG(a, b uint64) *rand.Rand { return rand.New(rand.NewPCG(a, b)) }

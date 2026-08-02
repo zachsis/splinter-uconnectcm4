@@ -34,7 +34,7 @@ func TestRenderFrame(t *testing.T) {
 
 	f := RenderFrame(m.Snapshot(), 90, 24)
 	for _, want := range []string{
-		"splinterd", "dense", "adv 100ms", "dwell 200ms",
+		"hohd", "dense", "adv 100ms", "dwell 200ms",
 		"rate", "fails", "Galaxy Buds", "Samsung", "crowd", "learned devices", "help", "quit",
 	} {
 		if !strings.Contains(f, want) {
@@ -126,7 +126,7 @@ func TestRenderFrameNarrow(t *testing.T) {
 	m.Rate(4, 0)
 	// Must not panic and must still render at a tiny width.
 	f := RenderFrame(m.Snapshot(), 20, 10)
-	if !strings.Contains(f, "splinterd") {
+	if !strings.Contains(f, "hohd") {
 		t.Errorf("narrow frame missing header:\n%s", f)
 	}
 }
