@@ -15,22 +15,24 @@ const histLen = 60
 
 // Model accumulates decoy activity. It implements engine.Reporter.
 type Model struct {
-	mu         sync.Mutex
-	start      time.Time
-	total      uint64
-	failsCum   uint64
-	rateHist   []int
-	failHist   []int
-	lastAddr   [6]byte
-	lastName   string
-	lastID     uint16
-	haveLast   bool
-	vendorHist map[uint16]int
-	mode       string
-	advMs      int
-	rotateMs   int
-	themeIdx   int
-	colorOn    bool
+	mu          sync.Mutex
+	start       time.Time
+	total       uint64
+	failsCum    uint64
+	rateHist    []int
+	failHist    []int
+	lastAddr    [6]byte
+	lastName    string
+	lastID      uint16
+	haveLast    bool
+	vendorHist  map[uint16]int
+	mode        string
+	advMs       int
+	rotateMs    int
+	themeIdx    int
+	colorOn     bool
+	learnActive bool
+	learnLine   string
 }
 
 // SetColor enables or disables ANSI color (disabled => mono regardless of theme).
@@ -73,6 +75,23 @@ func (m *Model) effectiveTheme() Theme {
 type RateAdjuster interface {
 	Millis() int
 	Adjust(deltaMs int) int
+}
+
+// LearnController is the subset of engine.LearnControl the dashboard needs to
+// trigger and display learn mode. *engine.LearnControl satisfies it.
+type LearnController interface {
+	Request()
+	Learning() bool
+	Summary() string
+}
+
+// SetLearn updates the displayed learn-mode status (the render loop mirrors the
+// LearnController here so the Snapshot carries it).
+func (m *Model) SetLearn(active bool, summary string) {
+	m.mu.Lock()
+	m.learnActive = active
+	m.learnLine = summary
+	m.mu.Unlock()
 }
 
 // SetRate updates the displayed rotation interval (called when a hotkey changes it).
@@ -128,20 +147,22 @@ type VendorCount struct {
 
 // Snapshot is an immutable view of the model for rendering.
 type Snapshot struct {
-	Uptime   time.Duration
-	Total    uint64
-	FailsCum uint64
-	RateHist []int
-	FailHist []int
-	LastAddr [6]byte
-	LastName string
-	LastID   uint16
-	HaveLast bool
-	Vendors  []VendorCount
-	Mode     string
-	AdvMs    int
-	RotateMs int
-	Theme    Theme
+	Uptime      time.Duration
+	Total       uint64
+	FailsCum    uint64
+	RateHist    []int
+	FailHist    []int
+	LastAddr    [6]byte
+	LastName    string
+	LastID      uint16
+	HaveLast    bool
+	Vendors     []VendorCount
+	Mode        string
+	AdvMs       int
+	RotateMs    int
+	Theme       Theme
+	LearnActive bool
+	LearnLine   string
 }
 
 // Snapshot copies the current state under lock.
@@ -159,19 +180,21 @@ func (m *Model) Snapshot() Snapshot {
 		return vs[i].ID < vs[j].ID
 	})
 	return Snapshot{
-		Uptime:   time.Since(m.start),
-		Total:    m.total,
-		FailsCum: m.failsCum,
-		RateHist: append([]int(nil), m.rateHist...),
-		FailHist: append([]int(nil), m.failHist...),
-		LastAddr: m.lastAddr,
-		LastName: m.lastName,
-		LastID:   m.lastID,
-		HaveLast: m.haveLast,
-		Vendors:  vs,
-		Mode:     m.mode,
-		AdvMs:    m.advMs,
-		RotateMs: m.rotateMs,
-		Theme:    m.effectiveTheme(),
+		Uptime:      time.Since(m.start),
+		Total:       m.total,
+		FailsCum:    m.failsCum,
+		RateHist:    append([]int(nil), m.rateHist...),
+		FailHist:    append([]int(nil), m.failHist...),
+		LastAddr:    m.lastAddr,
+		LastName:    m.lastName,
+		LastID:      m.lastID,
+		HaveLast:    m.haveLast,
+		Vendors:     vs,
+		Mode:        m.mode,
+		AdvMs:       m.advMs,
+		RotateMs:    m.rotateMs,
+		Theme:       m.effectiveTheme(),
+		LearnActive: m.learnActive,
+		LearnLine:   m.learnLine,
 	}
 }

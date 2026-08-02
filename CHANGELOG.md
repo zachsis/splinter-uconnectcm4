@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- **Learn mode** (dashboard `l` key): passively scans nearby BLE (`--learn-window`,
+  default 15s) and weights decoy selection toward the observed vendor mix — the
+  fakes blend into the devices actually around you. Never replays real
+  addresses/payloads. (#17)
+- **htop-style crowd table**: the vendor "crowd" is now a multi-row table (name ·
+  bar · count), sorted, height-adaptive. (#23)
+- **Taller rate graph**: the rate history renders as a ~4-row block graph (~32
+  vertical levels), height-adaptive; fails stays a compact sparkline. (#22)
+
+### Added
 - **Dashboard hotkeys** (`--dashboard`): `+`/`-` adjust the live rate (clamped to
   the visibility floor), `t` cycles the color theme, `q`/Ctrl-C quits. (#16)
 - **Color themes** for the dashboard: `--theme matrix|amber|neon|mono` + live `t`
