@@ -32,9 +32,12 @@ vendor-ID spread and the guardrails.
 - **Distinct-MAC rate** ≥ 50% of the theoretical `1000/rotate-ms` (passive
   scanning never captures every advert, so a 50% floor keeps the check honest).
 - **Vendor-ID spread** — a variety of company IDs, not all identical.
-- **Guardrails (hard failures):** no advert carries an Apple (`0x004C`) or
-  Microsoft (`0x0006`) company ID, no Google Fast Pair (`0xFE2C`) service data,
-  and every decoy is non-connectable.
+- **Guardrails (hard failures):** the checks are defined around bystander harm,
+  not vendor identity — no advert carries a Microsoft Swift Pair (`0x0006`)
+  company ID, an Apple Find My (`0x12`) message, or a *discoverable* Google Fast
+  Pair frame (a 3-byte model ID — the ones that pop a pairing prompt), and every
+  decoy is non-connectable. Apple presence beacons (`0x004C` naive / Nearby Info),
+  Tile (`0xFEED`), and *non-discoverable* Fast Pair are allowed.
 
 It prints a `parity PASS/FAIL` summary with the per-vendor histogram and exits
 non-zero on failure.

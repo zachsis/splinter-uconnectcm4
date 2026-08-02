@@ -19,6 +19,10 @@ type Config struct {
 	Dashboard    bool          // live mtr-style terminal dashboard instead of line logs
 	Theme        string        // dashboard color theme name
 	LearnWindow  time.Duration // learn-mode passive scan window
+	AppleMode    string        // Apple decoy mode: off|naive|nearform (initial; dashboard 'a' cycles live)
+	AppleShare   int           // % of decoys that impersonate Apple when AppleMode != off
+	Trackers     bool          // emit service-data trackers (Tile/Fast Pair); dashboard 's' toggles live
+	TrackerShare int           // % of decoys that are service-data trackers when Trackers is on
 	HCIIndex     int           // hciX device index to drive
 	Verbose      bool          // debug logging
 }
@@ -34,6 +38,10 @@ func Default() Config {
 		AdvertsPerID: 2,
 		Theme:        "matrix",
 		LearnWindow:  15 * time.Second,
+		AppleMode:    "naive",
+		AppleShare:   15,
+		Trackers:     false,
+		TrackerShare: 20,
 		HCIIndex:     0,
 		Verbose:      false,
 	}

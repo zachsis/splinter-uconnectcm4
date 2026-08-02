@@ -134,4 +134,11 @@ func TestParseMgmtCmdComplete(t *testing.T) {
 	if _, matched, _ := parseMgmtCmdComplete(frame, mgmtOpSetPowered); matched {
 		t.Fatalf("mgmt should not match different opcode")
 	}
+	// A Command STATUS (0x0002) with Busy must also match (the fix): the frame is
+	// event 0x0002, cmd_op SET_POWERED, status 0x0a.
+	busy := []byte{0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x05, 0x00, MgmtStatusBusy}
+	if status, matched, _ := parseMgmtCmdComplete(busy, mgmtOpSetPowered); !matched || status != MgmtStatusBusy {
+		t.Fatalf("CMD_STATUS busy should match with status %#02x, got matched=%v status=%#02x",
+			MgmtStatusBusy, matched, status)
+	}
 }

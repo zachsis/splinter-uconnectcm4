@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zachsis/splinter-uconnectcm4/internal/config"
+	"github.com/zachsis/splinter-uconnectcm4/internal/decoy"
 )
 
 // fakeCtrl records the sequence of controller calls and can inject an error on a
@@ -56,7 +57,7 @@ func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, n
 
 func TestCycleOrder(t *testing.T) {
 	f := &fakeCtrl{}
-	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2)), nil); err != nil {
+	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2)), decoy.Options{}); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"disable", "addr", "data", "enable"}
@@ -73,7 +74,7 @@ func TestCycleOrder(t *testing.T) {
 
 func TestCycleAbortsOnError(t *testing.T) {
 	f := &fakeCtrl{failOn: "addr", failWith: errors.New("boom")}
-	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2)), nil); err == nil {
+	if _, _, err := cycle(f, config.Default(), rand.New(rand.NewPCG(1, 2)), decoy.Options{}); err == nil {
 		t.Fatal("expected error")
 	}
 	// After the failing SetRandomAddr, no data/enable should have run.
@@ -116,7 +117,7 @@ func TestRunPacedStopsOnCtx(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil, nil, nil); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	calls := f.snapshot()
@@ -132,7 +133,7 @@ func TestRunSetsParamsOnceAndDisablesOnExit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	defer cancel()
 
-	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil, nil, nil); err != nil {
+	if err := Run(ctx, f, cfg, quietLog(), LogReporter{quietLog()}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if f.params != 1 {

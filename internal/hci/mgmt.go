@@ -25,14 +25,16 @@ func mgmtCommand(op uint16, index uint16, params []byte) []byte {
 }
 
 // parseMgmtCmdComplete inspects a management event frame and, if it is a Command
-// Complete for wantOp, returns its status. matched is false for other events.
+// Complete OR a Command Status for wantOp, returns its status. matched is false
+// for other events. (A command that fails immediately — e.g. Set Powered while
+// the controller is Busy — comes back as Command Status, not Command Complete;
+// both carry [cmd_op:u16 @6][status:u8 @8], so we accept either.)
 func parseMgmtCmdComplete(pkt []byte, wantOp uint16) (status byte, matched bool, ok bool) {
-	// [0:2]=event, [2:4]=index, [4:6]=len, then for CMD_COMPLETE: [6:8]=cmd_op, [8]=status
 	if len(pkt) < 9 {
 		return 0, false, len(pkt) >= 6 // short-but-valid header => keep reading
 	}
 	ev := binary.LittleEndian.Uint16(pkt[0:2])
-	if ev != mgmtEvCmdComplete {
+	if ev != mgmtEvCmdComplete && ev != mgmtEvCmdStatus {
 		return 0, false, true
 	}
 	if binary.LittleEndian.Uint16(pkt[6:8]) != wantOp {
@@ -40,6 +42,16 @@ func parseMgmtCmdComplete(pkt []byte, wantOp uint16) (status byte, matched bool,
 	}
 	return pkt[8], true, true
 }
+
+// MgmtStatusBusy is the mgmt status returned when the controller can't be
+// powered off right now (e.g. bluetoothd has an active connection/operation).
+const MgmtStatusBusy = 0x0a
+
+// MgmtStatusPermissionDenied is returned when the process lacks the privilege
+// for a mgmt command. Opening the control socket is allowed unprivileged, but
+// commands like Set Powered need CAP_NET_ADMIN — so this surfaces as a command
+// status rather than a socket error, and almost always means "not run as root".
+const MgmtStatusPermissionDenied = 0x14
 
 // setPoweredParam is the 1-byte payload for MGMT_OP_SET_POWERED.
 func setPoweredParam(on bool) []byte {

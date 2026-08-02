@@ -15,18 +15,33 @@ import (
 
 // Observation is one advertising report seen by the scanner.
 type Observation struct {
-	MAC         [6]byte
-	Connectable bool
-	CompanyID   uint16 // valid only when HasMfg
-	HasMfg      bool
-	Name        string
-	FastPair    bool // carried a Google Fast Pair (0xFE2C) service-data block
+	MAC                  [6]byte
+	Connectable          bool
+	CompanyID            uint16 // valid only when HasMfg
+	HasMfg               bool
+	Name                 string
+	FastPair             bool // any Google Fast Pair (0xFE2C) service-data block
+	FastPairDiscoverable bool // Fast Pair model-ID (discoverable) frame — pops a pairing sheet
+	AppleFindMy          bool // Apple Find My / offline-finding (0x12) message
+	Tile                 bool // Tile (0xFEED) service data / UUID
+}
+
+// AdInfo holds the fields the harness extracts from one advertising payload.
+type AdInfo struct {
+	CompanyID            uint16 // valid only when HasMfg
+	HasMfg               bool
+	Name                 string
+	FastPair             bool
+	FastPairDiscoverable bool
+	AppleFindMy          bool
+	Tile                 bool
 }
 
 // ParseAdvData walks a raw advertising payload and extracts the fields the
 // harness cares about. Malformed structures are skipped rather than erroring —
 // the scanner sees real-world traffic, not just splinterd's.
-func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fastPair bool) {
+func ParseAdvData(data []byte) AdInfo {
+	var info AdInfo
 	for i := 0; i < len(data); {
 		l := int(data[i])
 		if l == 0 || i+1+l > len(data) {
@@ -36,23 +51,66 @@ func ParseAdvData(data []byte) (companyID uint16, hasMfg bool, name string, fast
 		body := data[i+2 : i+1+l]
 		switch typ {
 		case 0x08, 0x09: // shortened / complete local name
-			name = string(body)
+			info.Name = string(body)
+		case adServiceUUID16: // complete list of 16-bit service UUIDs
+			for j := 0; j+1 < len(body); j += 2 {
+				if uint16(body[j])|uint16(body[j+1])<<8 == decoy.ServiceTile {
+					info.Tile = true
+				}
+			}
 		case 0xFF: // manufacturer specific data
 			if len(body) >= 2 {
-				companyID = uint16(body[0]) | uint16(body[1])<<8
-				hasMfg = true
+				info.CompanyID = uint16(body[0]) | uint16(body[1])<<8
+				info.HasMfg = true
+				if info.CompanyID == decoy.CompanyApple && hasAppleMsgType(body[2:], decoy.AppleFindMyType) {
+					info.AppleFindMy = true
+				}
 			}
-		case 0x16: // service data - 16-bit UUID
+		case adServiceData16: // service data - 16-bit UUID
 			if len(body) >= 2 {
 				uuid := uint16(body[0]) | uint16(body[1])<<8
-				if uuid == decoy.ServiceGoogleFastPair {
-					fastPair = true
+				sd := body[2:]
+				switch uuid {
+				case decoy.ServiceGoogleFastPair:
+					info.FastPair = true
+					// A discoverable Fast Pair advert is exactly a 3-byte model ID;
+					// a non-discoverable one leads with a version/flags byte and an
+					// account-key filter (length != 3, and never pops a pair sheet).
+					if len(sd) == 3 {
+						info.FastPairDiscoverable = true
+					}
+				case decoy.ServiceTile:
+					info.Tile = true
 				}
 			}
 		}
 		i += 1 + l
 	}
-	return
+	return info
+}
+
+// AD type numbers reused from the decoy package's on-air constants.
+const (
+	adServiceUUID16 = 0x03
+	adServiceData16 = 0x16
+)
+
+// hasAppleMsgType reports whether the Apple Continuity payload (the bytes after
+// the 0x004C company ID) contains a message of the given type. Continuity packs
+// [type][len][payload...] messages back-to-back. The type byte is inspected at
+// every message boundary, including a lone trailing type byte with no length,
+// so a Find My type in the final position can't slip past the detector.
+func hasAppleMsgType(payload []byte, msgType byte) bool {
+	for i := 0; i < len(payload); {
+		if payload[i] == msgType {
+			return true
+		}
+		if i+1 >= len(payload) {
+			break // trailing type byte with no length; already checked above
+		}
+		i += 2 + int(payload[i+1])
+	}
+	return false
 }
 
 // Result is the outcome of analyzing a scan window.
@@ -77,30 +135,41 @@ func Analyze(obs []Observation, window time.Duration, expectedRotateMs int) Resu
 	r := Result{Window: window, Total: len(obs), IDHistogram: map[uint16]int{}}
 
 	macs := map[[6]byte]struct{}{}
-	var connectable, fastpair, excluded int
+	var connectable, fastpairDisc, excluded, findmy int
 	for _, o := range obs {
 		macs[o.MAC] = struct{}{}
 		if o.HasMfg {
 			r.IDHistogram[o.CompanyID]++
-			if o.CompanyID == decoy.CompanyApple || o.CompanyID == decoy.CompanyMicrosoft {
+			// Microsoft (Swift Pair) still pops a pairing prompt on bystanders and
+			// is never emitted. Apple presence beacons are allowed (they don't pop
+			// dialogs) — but an Apple Find My frame triggers anti-stalking alerts.
+			if o.CompanyID == decoy.CompanyMicrosoft {
 				excluded++
 			}
 		}
 		if o.Connectable {
 			connectable++
 		}
-		if o.FastPair {
-			fastpair++
+		// Tile and *non-discoverable* Fast Pair are allowed (no bystander UI); only
+		// a discoverable Fast Pair model-ID frame pops a "tap to pair" sheet.
+		if o.FastPairDiscoverable {
+			fastpairDisc++
+		}
+		if o.AppleFindMy {
+			findmy++
 		}
 	}
 	r.DistinctMACs = len(macs)
 	r.IDSpread = len(r.IDHistogram)
 
 	if excluded > 0 {
-		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an excluded company ID (Apple/Microsoft)", excluded))
+		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an excluded company ID (Microsoft Swift Pair)", excluded))
 	}
-	if fastpair > 0 {
-		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried a Google Fast Pair service-data block", fastpair))
+	if findmy > 0 {
+		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried an Apple Find My (0x12) message (triggers anti-stalking alerts)", findmy))
+	}
+	if fastpairDisc > 0 {
+		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) carried a discoverable Google Fast Pair frame (pops a pairing prompt)", fastpairDisc))
 	}
 	if connectable > 0 {
 		r.Violations = append(r.Violations, fmt.Sprintf("%d advert(s) were connectable (decoys must be non-connectable)", connectable))

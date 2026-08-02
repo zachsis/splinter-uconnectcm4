@@ -33,6 +33,8 @@ type Model struct {
 	colorOn     bool
 	learnActive bool
 	learnLine   string
+	appleMode   string
+	trackersOn  bool
 }
 
 // SetColor enables or disables ANSI color (disabled => mono regardless of theme).
@@ -83,6 +85,37 @@ type LearnController interface {
 	Request()
 	Learning() bool
 	Summary() string
+}
+
+// AppleController is the subset of engine.AppleControl the dashboard needs to
+// show and cycle the Apple-decoy mode. *engine.AppleControl satisfies it.
+type AppleController interface {
+	Mode() string  // current mode label (off|naive|nearby-info)
+	Cycle() string // advance to the next mode, returning its label
+}
+
+// SetAppleMode updates the displayed Apple-decoy mode (mirrored from the
+// AppleController so the Snapshot carries it).
+func (m *Model) SetAppleMode(mode string) {
+	m.mu.Lock()
+	m.appleMode = mode
+	m.mu.Unlock()
+}
+
+// TrackerController is the subset of engine.TrackerControl the dashboard needs
+// to show and toggle service-data tracker decoys. *engine.TrackerControl
+// satisfies it.
+type TrackerController interface {
+	Enabled() bool
+	Toggle() bool
+}
+
+// SetTrackers updates the displayed tracker-decoy state (mirrored from the
+// TrackerController so the Snapshot carries it).
+func (m *Model) SetTrackers(on bool) {
+	m.mu.Lock()
+	m.trackersOn = on
+	m.mu.Unlock()
 }
 
 // SetLearn updates the displayed learn-mode status (the render loop mirrors the
@@ -163,6 +196,8 @@ type Snapshot struct {
 	Theme       Theme
 	LearnActive bool
 	LearnLine   string
+	AppleMode   string
+	TrackersOn  bool
 }
 
 // Snapshot copies the current state under lock.
@@ -196,5 +231,7 @@ func (m *Model) Snapshot() Snapshot {
 		Theme:       m.effectiveTheme(),
 		LearnActive: m.learnActive,
 		LearnLine:   m.learnLine,
+		AppleMode:   m.appleMode,
+		TrackersOn:  m.trackersOn,
 	}
 }

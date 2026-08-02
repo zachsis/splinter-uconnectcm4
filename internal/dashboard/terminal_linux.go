@@ -55,11 +55,11 @@ func restoreTerm(fd int, old *unix.Termios) {
 // Run drives the dashboard: it puts the terminal into raw mode + the alternate
 // screen, reads keypresses (+/- rate, q quit), redraws ~4x/sec until ctx is
 // cancelled, then fully restores the terminal on return (including panic unwind).
-func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func(), learn LearnController) {
+func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdjuster, onQuit func(), learn LearnController, apple AppleController, trackers TrackerController) {
 	inFd := int(os.Stdin.Fd())
 	if old, err := enableRaw(inFd); err == nil {
 		defer restoreTerm(inFd, old)
-		go readKeys(ctx, m, rate, onQuit, learn)
+		go readKeys(ctx, m, rate, onQuit, learn, apple, trackers)
 	}
 
 	fmt.Fprint(out, "\x1b[?1049h\x1b[?25l")       // alt screen + hide cursor
@@ -68,6 +68,12 @@ func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdju
 	draw := func() {
 		if learn != nil {
 			m.SetLearn(learn.Learning(), learn.Summary())
+		}
+		if apple != nil {
+			m.SetAppleMode(apple.Mode())
+		}
+		if trackers != nil {
+			m.SetTrackers(trackers.Enabled())
 		}
 		w, h := termSize(fd)
 		fmt.Fprint(out, "\x1b[H\x1b[2J"+RenderFrame(m.Snapshot(), w, h))
@@ -88,7 +94,7 @@ func Run(ctx context.Context, m *Model, out io.Writer, fd uintptr, rate RateAdju
 
 // readKeys reads single keypresses and applies them until ctx is cancelled. It
 // uses a short read deadline so it can observe cancellation promptly.
-func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func(), learn LearnController) {
+func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func(), learn LearnController, apple AppleController, trackers TrackerController) {
 	buf := make([]byte, 1)
 	for ctx.Err() == nil {
 		_ = os.Stdin.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
@@ -119,6 +125,14 @@ func readKeys(ctx context.Context, m *Model, rate RateAdjuster, onQuit func(), l
 		case 'l', 'L':
 			if learn != nil {
 				learn.Request()
+			}
+		case 'a', 'A':
+			if apple != nil {
+				m.SetAppleMode(apple.Cycle())
+			}
+		case 's', 'S':
+			if trackers != nil {
+				m.SetTrackers(trackers.Toggle())
 			}
 		}
 	}
