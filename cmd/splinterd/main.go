@@ -144,15 +144,27 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 			m.SetAppleMode(apple.Mode())
 			trackers := engine.NewTrackerControl(cfg.Trackers)
 			m.SetTrackers(trackers.Enabled())
+			broadcast := engine.NewBroadcastControl()
+			// The engine logs through the debug logger, which discards until the
+			// 'D' key arms it — so the dashboard frame is never corrupted, but
+			// debug capture to a file works on demand.
+			debug, dlog := engine.NewDebugControl(cfg.LogFile)
+			if cfg.Debug {
+				if err := debug.Enable(); err != nil {
+					log.Warn("could not open debug log", "err", err)
+				}
+			}
+			m.SetDebug(debug.Enabled(), debug.Path())
 			scanner, _ := conn.(engine.Scanner) // *hci.Conn scans; nil disables learn
 			done := make(chan struct{})
 			go func() {
-				dashboard.Run(runCtx, m, os.Stdout, os.Stdout.Fd(), rate, runCancel, learn, apple, trackers)
+				dashboard.Run(runCtx, m, os.Stdout, os.Stdout.Fd(), dashboard.Controls{
+					Rate: rate, Learn: learn, Apple: apple, Trackers: trackers,
+					Broadcast: broadcast, Debug: debug, OnQuit: runCancel,
+				})
 				close(done)
 			}()
-			// Logs would corrupt the frame, so silence the engine's logger while
-			// the dashboard owns the screen.
-			err := engine.Run(runCtx, conn, cfg, quietLogger(), m, rate, scanner, learn, apple, trackers)
+			err := engine.Run(runCtx, conn, cfg, dlog, m, rate, scanner, learn, apple, trackers, broadcast)
 			runCancel()
 			<-done // wait for the terminal to be restored
 			return err
@@ -160,10 +172,20 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 		log.Warn("--dashboard: stdout is not a terminal; falling back to line logging")
 	}
 
-	log.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
+	logger := log
+	if cfg.Debug || cfg.LogFile != "" {
+		if f, path, err := engine.OpenDebugFile(cfg.LogFile); err == nil {
+			logger = slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f),
+				&slog.HandlerOptions{Level: slog.LevelDebug}))
+			logger.Info("debug log", "path", path)
+		} else {
+			log.Warn("could not open debug log", "err", err)
+		}
+	}
+	logger.Info("splinterd starting", "version", version, "hci", cfg.HCIIndex, "mode", mode)
 	apple := engine.NewAppleControl(appleKind(cfg))
 	trackers := engine.NewTrackerControl(cfg.Trackers)
-	return engine.Run(ctx, conn, cfg, log, engine.LogReporter{Log: log}, nil, nil, nil, apple, trackers)
+	return engine.Run(ctx, conn, cfg, logger, engine.LogReporter{Log: logger}, nil, nil, nil, apple, trackers, nil)
 }
 
 // appleKind resolves the validated cfg.AppleMode string to an engine AppleKind.
@@ -172,10 +194,6 @@ func runLoop(ctx context.Context, conn engine.Controller, cfg config.Config, log
 func appleKind(cfg config.Config) decoy.AppleKind {
 	kind, _ := engine.ParseAppleMode(cfg.AppleMode)
 	return kind
-}
-
-func quietLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 // runBenchmark probes advertising intervals for a bounded window and prints the

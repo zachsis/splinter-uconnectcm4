@@ -27,7 +27,8 @@ type LearnControl struct {
 	requested      bool
 	learning       bool
 	weights        []int
-	trackerWeights []int // [Tile, FastPair], parallel to decoy.TrackerKind
+	trackerWeights []int                // [Tile, FastPair], parallel to decoy.TrackerKind
+	devices        []verify.Observation // the devices seen in the last scan (for the learned table)
 	summary        string
 }
 
@@ -87,6 +88,58 @@ func (l *LearnControl) trackerWeightsSnapshot() []int {
 		return nil
 	}
 	return append([]int(nil), l.trackerWeights...)
+}
+
+func (l *LearnControl) setDevices(d []verify.Observation) {
+	l.mu.Lock()
+	l.devices = d
+	l.mu.Unlock()
+}
+
+// Devices returns the devices observed in the last learn scan (for the dashboard
+// learned-devices table). The dashboard's LearnController interface exposes it.
+func (l *LearnControl) Devices() []verify.Observation {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]verify.Observation(nil), l.devices...)
+}
+
+// buildLearnedDevices turns raw scan reports into deduplicated observations for
+// the learned table, keeping the strongest-RSSI sighting of each MAC and sorted
+// by descending signal strength (closest first).
+func buildLearnedDevices(reports []hci.AdvReport) []verify.Observation {
+	byMAC := map[[6]byte]verify.Observation{}
+	for _, r := range reports {
+		info := verify.ParseAdvData(r.Data)
+		o := verify.Observation{
+			MAC: r.Addr, Connectable: r.Connectable, RSSI: r.RSSI,
+			CompanyID: info.CompanyID, HasMfg: info.HasMfg, Name: info.Name,
+			FastPair: info.FastPair, FastPairDiscoverable: info.FastPairDiscoverable,
+			AppleFindMy: info.AppleFindMy, Tile: info.Tile,
+		}
+		// Keep the strongest sighting, but let a later one fill in a name/ID a
+		// weaker earlier advert lacked.
+		if prev, ok := byMAC[r.Addr]; ok {
+			if o.Name == "" {
+				o.Name = prev.Name
+			}
+			if !o.HasMfg && prev.HasMfg {
+				o.CompanyID, o.HasMfg = prev.CompanyID, true
+			}
+			o.Tile = o.Tile || prev.Tile
+			o.FastPair = o.FastPair || prev.FastPair
+			if prev.RSSI > o.RSSI {
+				o.RSSI = prev.RSSI
+			}
+		}
+		byMAC[r.Addr] = o
+	}
+	out := make([]verify.Observation, 0, len(byMAC))
+	for _, o := range byMAC {
+		out = append(out, o)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].RSSI > out[j].RSSI })
+	return out
 }
 
 // Learning reports whether a learning scan is currently running.

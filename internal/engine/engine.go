@@ -48,7 +48,7 @@ func (r LogReporter) Rate(devPerSec, fails int) {
 // Run drives the rotation loop until ctx is cancelled. Advertising parameters
 // are set once up front; each cycle then disables advertising, mints a fresh
 // random MAC + decoy payload, and re-enables. On return, advertising is disabled.
-func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl, apple *AppleControl, trackers *TrackerControl) error {
+func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logger, rep Reporter, rate *RateControl, scanner Scanner, learn *LearnControl, apple *AppleControl, trackers *TrackerControl, broadcast *BroadcastControl) error {
 	rng := newRNG()
 
 	if rate == nil {
@@ -100,31 +100,39 @@ func Run(ctx context.Context, ctrl Controller, cfg config.Config, log *slog.Logg
 			} else {
 				w, tw, summary := learnWeights(reports)
 				learn.setResult(w, tw, summary)
+				learn.setDevices(buildLearnedDevices(reports))
 				log.Info("learn: reweighted decoys", "observed", summary)
 			}
 			learn.setLearning(false)
 		}
 
-		opts := decoy.Options{AppleShare: cfg.AppleShare, TrackerShare: cfg.TrackerShare}
-		if apple != nil {
-			opts.Apple = apple.Kind()
-		}
-		if trackers != nil {
-			opts.Trackers = trackers.Enabled()
-		}
-		if learn != nil {
-			opts.Weights = learn.weightsSnapshot()
-			opts.TrackerWeights = learn.trackerWeightsSnapshot()
-		}
-		addr, d, err := cycle(ctrl, cfg, rng, opts)
-		if err != nil {
-			fail++
-			if cfg.Verbose {
-				log.Debug("decoy cycle failed", "err", err)
-			}
+		// Pause switch (dashboard Space): stop minting and disable advertising,
+		// but keep the controller — resuming continues without a re-takeover.
+		if broadcast != nil && broadcast.Paused() {
+			_ = ctrl.SetAdvEnable(false)
 		} else {
-			ok++
-			rep.Decoy(addr, d.CompanyID, d.Name)
+			opts := decoy.Options{AppleShare: cfg.AppleShare, TrackerShare: cfg.TrackerShare}
+			if apple != nil {
+				opts.Apple = apple.Kind()
+			}
+			if trackers != nil {
+				opts.Trackers = trackers.Enabled()
+			}
+			if learn != nil {
+				opts.Weights = learn.weightsSnapshot()
+				opts.TrackerWeights = learn.trackerWeightsSnapshot()
+			}
+			addr, d, err := cycle(ctrl, cfg, rng, opts)
+			if err != nil {
+				fail++
+				if cfg.Verbose {
+					log.Debug("decoy cycle failed", "err", err)
+				}
+			} else {
+				ok++
+				rep.Decoy(addr, d.CompanyID, d.Name)
+				log.Debug("decoy", "mac", macString(addr), "id", d.CompanyID, "name", d.Name)
+			}
 		}
 
 		select {
@@ -202,6 +210,11 @@ func cycle(ctrl Controller, cfg config.Config, rng *rand.Rand, opts decoy.Option
 		return addr, decoy.Decoy{}, err
 	}
 	return addr, d, nil
+}
+
+// macString formats a BLE address for debug logging.
+func macString(a [6]byte) string {
+	return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[0], a[1], a[2], a[3], a[4], a[5])
 }
 
 // newRNG seeds math/rand/v2 from crypto/rand.
