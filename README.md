@@ -5,6 +5,11 @@ concept from [JakeSwiz/splinter](https://github.com/JakeSwiz/splinter) (an ESP32
 firmware), targeting the **ClockworkPi uConsole (CM4)** and its onboard Bluetooth
 radio. No extra hardware required.
 
+![The hohd live dashboard running on a ClockworkPi uConsole](docs/dashboard.png)
+
+*The live `--dashboard` on a ClockworkPi uConsole — a churning decoy crowd, learn
+results, and the real devices it sees nearby (addresses partly redacted).*
+
 ## What it does
 
 `hohd` continuously fabricates a churning crowd of plausible-but-fake
